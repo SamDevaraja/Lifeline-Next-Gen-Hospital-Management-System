@@ -1,81 +1,89 @@
+# 🏥 Lifeline • Clinical Command Dashboard
 
-# Hospital Management
-![developer](https://img.shields.io/badge/Developed%20By%20%3A-Sumit%20Kumar-red)
----
-## screenshots
-### Homepage
-![homepage snap](https://github.com/sumitkumar1503/hospitalmanagement/blob/master/static/screenshots/homepage.png?raw=true)
-### Admin Dashboard
-![dashboard snap](https://github.com/sumitkumar1503/hospitalmanagement/blob/master/static/screenshots/admin_dashboard.png?raw=true)
-### Invoice
-![invoice snap](https://github.com/sumitkumar1503/hospitalmanagement/blob/master/static/screenshots/invoice.png?raw=true)
-### Doctor list
-![doctor snap](https://github.com/sumitkumar1503/hospitalmanagement/blob/master/static/screenshots/admin_doctor.png?raw=true)
----
-## Functions
-### Admin
-- Signup their account. Then Login (No approval Required).
-- Can register/view/approve/reject/delete doctor (approve those doctor who applied for job in their hospital).
-- Can admit/view/approve/reject/discharge patient (discharge patient when treatment is done).
-- Can Generate/Download Invoice pdf (Generate Invoice according to medicine cost, room charge, doctor charge and other charge).
-- Can view/book/approve Appointment (approve those appointments which is requested by patient).
-
-### Doctor
-- Apply for job in hospital. Then Login (Approval required by hospital admin, Then only doctor can login).
-- Can only view their patient details (symptoms, name, mobile ) assigned to that doctor by admin.
-- Can view their discharged(by admin) patient list.
-- Can view their Appointments, booked by admin.
-- Can delete their Appointment, when doctor attended their appointment.
-
-### Patient
-- Create account for admit in hospital. Then Login (Approval required by hospital admin, Then only patient can login).
-- Can view assigned doctor's details like ( specialization, mobile, address).
-- Can view their booked appointment status (pending/confirmed by admin).
-- Can book appointments.(approval required by admin)
-- Can view/download Invoice pdf (Only when that patient is discharged by admin).
+**Lifeline** is an elite, high-fidelity Hospital Management System (HMS) designed for modern clinical operations. Powered by a neural AI core and built on a decoupled full-stack architecture, Lifeline provides a premium, data-driven ecosystem for medical professionals and patients alike.
 
 ---
 
-## HOW TO RUN THIS PROJECT
-- Install Python(3.7.6) (Dont Forget to Tick Add to Path while installing Python)
-- Open Terminal and Execute Following Commands :
-```
-pip install django==3.0.5
-pip install django-widget-tweaks
-pip install xhtml2pdf
-```
-- Download This Project Zip Folder and Extract it
-- Move to project folder in Terminal. Then run following Commands :
-```
-py manage.py makemigrations
-py manage.py migrate
-py manage.py runserver
-```
-- Now enter following URL in Your Browser Installed On Your Pc
-```
-http://127.0.0.1:8000/
+## 🏛️ System Architecture
+
+Lifeline is engineered for performance, security, and scalability:
+
+*   **Frontend**: React 18+ (Vite) / Tailwind CSS / Framer Motion
+*   **Backend**: Django 5.2 / Django REST Framework (DRF)
+*   **Intelligence**: Google Gemini AI Integration (via Secure Proxy)
+*   **Database**: PostgreSQL (Neon DB) / SQLite (Fallback)
+*   **Security**: Token-based Authentication via `dj-rest-auth` & `allauth`
+*   **Reporting**: ReportLab PDF Engine
+
+---
+
+## 🚀 Key Modules & Intelligence
+
+### 🧠 Lifeline Neural Core (AI Agent)
+The built-in AI assistant processes natural language commands to streamline clinical workflows:
+- **Smart Rescheduling**: Move appointments via simple chat commands.
+- **Risk Assessment**: Analyze patient data to identify high-risk clinical profiles.
+- **Diagnostic Assistant**: symptom-based differential diagnosis suggestions.
+- **Resource Queries**: Instant check for doctor availability and department status.
+
+### 📊 Clinical Command Dashboard
+Real-time operational visibility for Administrators and Doctors:
+- **Revenue Analytics**: Track total revenue, pending bills, and payment trends.
+- **Patient Monitoring**: Critical risk-level filters and high-priority patient tracking.
+- **Resource Management**: Manage doctors, appointment schedules, and hospital capacity.
+
+### 💊 Pharmacy & Laboratory
+Integrated management for the entire clinical lifecycle:
+- **Pharmacy Records**: inventory tracking for medical supplies and pharmacy items.
+- **Lab Diagnostics**: Track lab tests, identify abnormal results, and archive medical history.
+
+### 🧾 Automated Billing & Invoicing
+- **One-Click PDF Invoices**: Professional, branded PDF generation for patient discharges and medications.
+- **Payment Lifecycle**: Track bills from pending status to full payment with multiple method support.
+
+---
+
+## 🌍 Developer Setup
+
+### 1. Backend API (Django)
+The backend requires Python 3.10+ and a virtual environment.
+
+```powershell
+# Create and activate virtual environment
+python -m venv .venv
+.\.venv\Scripts\activate
+
+# Install core dependencies
+pip install -r requirements.txt
+
+# Database initialization
+python manage.py migrate
+
+# Launch the Neural API
+python manage.py runserver
 ```
 
-## CHANGES REQUIRED FOR CONTACT US PAGE
-- In settins.py file, You have to give your email and password
-```
-EMAIL_HOST_USER = 'youremail@gmail.com'
-EMAIL_HOST_PASSWORD = 'your email password'
-EMAIL_RECEIVING_USER = 'youremail@gmail.com'
-```
-- Login to gmail through host email id in your browser and open following link and turn it ON
-```
-https://myaccount.google.com/lesssecureapps
-```
-## Drawbacks/LoopHoles
-- Any one can be Admin. There is no Approval required for admin account. So you can disable admin signup process and use any logic like creating superuser.
-- There should be at least one doctor in hospital before admitting patient. So first add doctor.
-- On update page of doctor/patient you must have to update password.
+### 2. Frontend Application (React)
+Ensure you have Node.js 18+ installed.
 
-## Disclaimer
-This project is developed for demo purpose and it's not supposed to be used in real application.
+```bash
+cd frontend
 
-## Feedback
-Any suggestion and feedback is welcome. You can message me on facebook
-- [Contact on Facebook](https://fb.com/sumit.luv)
-- [Subscribe my Channel LazyCoder On Youtube](https://youtube.com/lazycoders)
+# Install Node modules
+npm install
+
+# Start the development dashboard
+npm run dev
+```
+
+---
+
+## 🛠️ Performance & Scalability
+- **WhiteNoise Integration**: Optimized static file serving for production environments.
+- **Database Pooling**: Configured for Neon PostgreSQL with long-running connection support.
+- **CORS Configured**: Seamless communication between cross-origin React and Django environments.
+
+---
+
+### 📬 Contact & Support
+Developed for high-stakes medical environments. For technical inquiries or deployment support, please contact the development team.
