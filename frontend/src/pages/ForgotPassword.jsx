@@ -90,7 +90,7 @@ const ForgotPassword = () => {
                                                 <div className="relative">
                                                     <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 pointer-events-none opacity-50" style={{ color: 'var(--luna-text-main)' }} />
                                                     <input type="text" value={form.mobile} onChange={update('mobile')}
-                                                        className="input !pl-11 text-sm font-bold w-full !bg-button border-none" placeholder="+91 98765 43210" required autoComplete="off" />
+                                                        className="input !pl-11 text-sm font-bold w-full !bg-button border-none" placeholder="+91 7395954829" required autoComplete="off" />
                                                 </div>
                                             </div>
                                         </div>

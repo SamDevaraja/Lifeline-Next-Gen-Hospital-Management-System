@@ -197,7 +197,8 @@ ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
 REST_AUTH_SERIALIZERS = {
     'PASSWORD_RESET_SERIALIZER': 'hospital.serializers.CustomPasswordResetSerializer',
 }
-FRONTEND_URL = "http://localhost:5173", "http://localhost:5174"
+FRONTEND_URL = "http://localhost:5173" # Unified HMS Portal
+STAFF_FRONTEND_URL = "http://localhost:5173"
 
 # --- Social Auth Settings ---
 SOCIALACCOUNT_PROVIDERS = {

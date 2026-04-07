@@ -595,7 +595,7 @@ export const HIPAANotice = () => {
                         </p>
                         <p className="text-base font-black" style={{ color: 'var(--luna-text-main)' }}>
                             <a href="mailto:hipaa@lifeline.health" className="underline decoration-2 underline-offset-4" style={{ color: 'var(--luna-teal)' }}>hipaa@lifeline.health</a>
-                            {' '}| +91 98765 43210 | Bangalore 560001
+                            {' '}| +91 7395954829 | Bangalore 560001
                         </p>
                         <p className="text-[13px] font-bold mt-4" style={{ color: 'var(--luna-text-dim)' }}>
                             You may also file a complaint with the U.S. Department of Health and Human Services (HHS) Office for Civil Rights. We will not retaliate against you for filing a complaint.

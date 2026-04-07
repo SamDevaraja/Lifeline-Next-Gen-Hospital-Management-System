@@ -110,7 +110,9 @@ const ResourceList = ({ type, title, user }) => {
                         status: String(vals.status) === 'true',
                         risk_level: vals.risk_level || 'low'
                     };
-                    if (vals.assigned_doctor) {
+                    if (isDoctor && user.doctor_id) {
+                        payload.assigned_doctor = parseInt(user.doctor_id, 10);
+                    } else if (vals.assigned_doctor) {
                         payload.assigned_doctor = parseInt(vals.assigned_doctor, 10);
                     }
                     await api.post(`${type}/`, payload);
@@ -149,7 +151,9 @@ const ResourceList = ({ type, title, user }) => {
                         status: String(vals.status) === 'true',
                         risk_level: vals.risk_level || 'low'
                     };
-                    if (vals.assigned_doctor) {
+                    if (isDoctor && user.doctor_id) {
+                        payload.assigned_doctor = parseInt(user.doctor_id, 10);
+                    } else if (vals.assigned_doctor) {
                         payload.assigned_doctor = parseInt(vals.assigned_doctor, 10);
                     }
                     if (vals.password && vals.password.trim() !== '') {
@@ -273,9 +277,9 @@ const ResourceList = ({ type, title, user }) => {
         { key: 'status', label: 'Admittance State', type: 'select', initialValue: 'true', icon: <Activity className="w-4 h-4" />, options: [
             {label: 'Admitted / Active', value: 'true'}, {label: 'Discharged / Finalized', value: 'false'}
         ]},
-        { key: 'assigned_doctor', label: 'Assigned Lead Specialist', type: 'select', icon: <Stethoscope className="w-4 h-4" />, options: doctorsList.map(d => ({label: `Dr. ${d.get_name || d.user?.first_name}`, value: d.id})) },
+        !isDoctor && { key: 'assigned_doctor', label: 'Assigned Lead Specialist', type: 'select', icon: <Stethoscope className="w-4 h-4" />, options: doctorsList.map(d => ({label: `Dr. ${d.get_name || d.user?.first_name}`, value: d.id})) },
         { key: 'symptoms', label: 'Current Chief Complaint (Symptoms)', placeholder: 'Brief description...', fullWidth: true, icon: <HeartPulse className="w-4 h-4" /> }
-    ] : [
+    ].filter(Boolean) : [
         { key: 'first_name', label: 'First Name', initialValue: inputModal.item?.user?.first_name || (inputModal.item?.get_name || '').split(' ')[0] },
         { key: 'username', label: 'System Alias (Login)', initialValue: inputModal.item?.user?.username, disabled: true },
         { key: 'password', label: 'Override Vault Password', placeholder: 'Leave blank to keep unchanged', type: 'password' },
@@ -293,9 +297,9 @@ const ResourceList = ({ type, title, user }) => {
         { key: 'status', label: 'Admittance State', type: 'select', initialValue: String(inputModal.item?.status), options: [
             {label: 'Admitted / Active', value: 'true'}, {label: 'Discharged / Finalized', value: 'false'}
         ]},
-        { key: 'assigned_doctor', label: 'Assigned Lead Specialist', type: 'select', initialValue: inputModal.item?.assigned_doctor, options: doctorsList.map(d => ({label: `Dr. ${d.get_name || d.user?.first_name}`, value: d.id})) },
+        !isDoctor && { key: 'assigned_doctor', label: 'Assigned Lead Specialist', type: 'select', initialValue: inputModal.item?.assigned_doctor, options: doctorsList.map(d => ({label: `Dr. ${d.get_name || d.user?.first_name}`, value: d.id})) },
         { key: 'symptoms', label: 'Current Chief Complaint (Symptoms)', initialValue: inputModal.item?.symptoms, fullWidth: true }
-    ];
+    ].filter(Boolean);
 
     const getRiskColors = (level) => {
         switch(level) {
@@ -479,6 +483,16 @@ const ResourceList = ({ type, title, user }) => {
                                         
                                         <td className="text-center px-4 py-4 align-middle">
                                             <div className="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity mx-auto w-max">
+                                                {type === 'patients' && isDoctor && (
+                                                    <button onClick={() => {
+                                                        const url = `/dashboard/appointments?patient_id=${item.id}&patient_name=${encodeURIComponent(item.get_name)}`;
+                                                        window.location.href = url; // Hard nav or navigate if using hook
+                                                    }} title="Schedule Slot"
+                                                        className="p-1.5 rounded-lg border transition-all hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:-translate-y-0.5"
+                                                        style={{ color: '#10b981', background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                                                        <CalendarDays className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                                 <button onClick={(e) => { e.stopPropagation(); setDetailsModal({ open: true, item }); }} title="Execute Analytics"
                                                     className="p-1.5 rounded-lg border transition-all hover:bg-teal-500/10 hover:border-teal-500/30 hover:-translate-y-0.5"
                                                     style={{ color: LUNA.teal, background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>

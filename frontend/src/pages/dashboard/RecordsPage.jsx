@@ -53,6 +53,13 @@ const RecordsPage = ({ user }) => {
                 if (isAdminOrClinical) {
                     const patRes = await api.get('patients/');
                     setPatients(patRes.data);
+                    
+                    // Auto-open modal if context passed from Telemedicine
+                    const params = new URLSearchParams(window.location.search);
+                    const pid = params.get('patient_id');
+                    if (pid) {
+                        setRecordModal({ open: true, initialPatient: pid });
+                    }
                 }
             } catch (err) {
                 console.error("Records fetch failed", err);
@@ -75,7 +82,7 @@ const RecordsPage = ({ user }) => {
                 isOpen={recordModal.open}
                 title="Log New Medical Record & Vitals"
                 fields={[
-                    { key: 'patient', label: 'Patient', type: 'select', options: patients.map(p => ({ value: p.id, label: p.get_name })) },
+                    { key: 'patient', label: 'Patient', type: 'select', options: patients.map(p => ({ value: p.id, label: p.get_name })), initialValue: recordModal.initialPatient },
                     { key: 'diagnosis', label: 'Primary Diagnosis / Notes', placeholder: 'Enter clinical observations...' },
                     { key: 'vitals', label: 'Vitals (BP, Temp, HR)', placeholder: 'e.g. 120/80 mmHg, 98.6F, 72BPM' },
                 ]}

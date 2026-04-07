@@ -6,10 +6,11 @@ import {
     FileText, Bell, DollarSign, Stethoscope, BrainCircuit,
     BarChart3, AlertCircle, CheckCircle, Clock, X, Menu,
     Video, Pill, FlaskConical, Smartphone, QrCode, User, ArrowRight, Sun, Moon, Globe, ChevronDown, Filter,
-    Mail, Lock
+    Mail, Lock, Archive, Bed
 } from 'lucide-react';
-import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Line } from 'recharts';
+import logo from '/lifeline_themed_v1.svg?v=cachebust123';
 import api from '../api/axios';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTheme } from '../context/ThemeContext';
@@ -37,19 +38,22 @@ const LUNA = {
 
 
 
+import Overview from './dashboard/Overview';
+import DispensaryPage from './dashboard/DispensaryPage';
+import PharmacyPage from './dashboard/PharmacyPage';
 import { ConfirmModal, InputModal, DetailsModal } from './dashboard/Modals';
-const Overview = lazy(() => import('./dashboard/Overview'));
+
 const ResourceList = lazy(() => import('./dashboard/ResourceList'));
 const AppointmentList = lazy(() => import('./dashboard/AppointmentList'));
 const BillingPage = lazy(() => import('./dashboard/BillingPage'));
 const RecordsPage = lazy(() => import('./dashboard/RecordsPage'));
 const TelemedicinePage = lazy(() => import('./dashboard/TelemedicinePage'));
-const PharmacyPage = lazy(() => import('./dashboard/PharmacyPage'));
 const LabPage = lazy(() => import('./dashboard/LabPage'));
 const NotificationsPage = lazy(() => import('./dashboard/NotificationsPage'));
 const ReportsPage = lazy(() => import('./dashboard/ReportsPage'));
 const SettingsPage = lazy(() => import('./dashboard/SettingsPage'));
-const TaskPage = lazy(() => import('./dashboard/TaskPage'));
+const AIPage = lazy(() => import('./dashboard/AIPage'));
+const AdmissionsPage = lazy(() => import('./dashboard/AdmissionsPage'));
 
 const getNavGroups = (role) => {
     const r = (role || '').toLowerCase();
@@ -58,8 +62,6 @@ const getNavGroups = (role) => {
     const isPatient = r === 'patient';
     const isReceptionist = r === 'receptionist';
     const isPharmacist = r === 'pharmacist';
-    const isNurse = r === 'nurse';
-    const isSupervisor = r === 'supervisor';
 
     const groups = [];
 
@@ -69,8 +71,6 @@ const getNavGroups = (role) => {
     else if (isPatient) overviewLabel = 'My Health Hub';
     else if (isReceptionist) overviewLabel = 'Reception Desk';
     else if (isPharmacist) overviewLabel = 'Pharmacy Panel';
-    else if (isNurse) overviewLabel = 'Nurse Station';
-    else if (isSupervisor) overviewLabel = 'Supervisor Panel';
 
     groups.push({
         title: 'Platform Overview',
@@ -79,58 +79,67 @@ const getNavGroups = (role) => {
         ]
     });
 
-    if (isAdmin || isDoctor || isReceptionist || isNurse) {
+    if (isAdmin || isDoctor || isReceptionist) {
         const opsItems = [];
         if (isAdmin) {
             opsItems.push({ to: '/dashboard/doctors', icon: <Stethoscope className="w-5 h-5" />, label: 'Specialists' });
         }
-        if (isAdmin || isReceptionist || isNurse || isDoctor) {
+        if (isAdmin || isReceptionist || isDoctor) {
             opsItems.push({ to: '/dashboard/patients', icon: <HeartPulse className="w-5 h-5" />, label: isDoctor ? 'My Patients' : 'Patient Registry' });
         }
         if (isAdmin || isReceptionist || isDoctor) {
             opsItems.push({ to: '/dashboard/appointments', icon: <Calendar className="w-5 h-5" />, label: 'Schedule' });
         }
-        if (isAdmin || isDoctor || isNurse) {
+        if (isAdmin || isReceptionist || isDoctor) {
+            opsItems.push({ to: '/dashboard/admissions', icon: <Bed className="w-5 h-5" />, label: 'Ward Admissions' });
+        }
+        if (isAdmin || isDoctor) {
             opsItems.push({ to: '/dashboard/records', icon: <FileText className="w-5 h-5" />, label: 'Clinical Records' });
         }
-        if (isAdmin || isDoctor || isNurse) {
+        if (isAdmin || isDoctor) {
             opsItems.push({ to: '/dashboard/telemedicine', icon: <Video className="w-5 h-5" />, label: 'Tele-Consults' });
+        }
+        if (isAdmin || isDoctor || isPatient) {
+            opsItems.push({ to: '/dashboard/ai', icon: <BrainCircuit className="w-5 h-5" />, label: 'Clinical Intel' });
         }
         groups.push({ title: 'Clinical Operations', items: opsItems });
     }
 
     // Strict Clinical Side. No patient routes here.
 
-    if (isAdmin || isPharmacist || isNurse) {
+    if (isAdmin || isPharmacist || isDoctor) {
         const invItems = [];
-        if (isAdmin || isPharmacist) {
+        if (isAdmin || isPharmacist || isDoctor) {
             invItems.push({ to: '/dashboard/pharmacy', icon: <Pill className="w-5 h-5" />, label: 'Pharmacy Core' });
         }
-        if (isAdmin || isNurse || isPharmacist) {
+        if (isAdmin || isPharmacist) {
+            invItems.push({ to: '/dashboard/dispensary', icon: <Archive className="w-5 h-5" />, label: 'Dispensary Engine' });
             invItems.push({ to: '/dashboard/lab', icon: <FlaskConical className="w-5 h-5" />, label: 'Diagnostics' });
         }
         groups.push({ title: 'Inventory & Labs', items: invItems });
     }
 
-    if (isAdmin || isSupervisor) {
-        const opsItems = [];
-        if (isAdmin || isSupervisor) {
-            opsItems.push({ to: '/dashboard/tasks', icon: <CheckCircle className="w-5 h-5" />, label: 'Facility Tasks' });
-        }
-        groups.push({ title: 'Facility Management', items: opsItems });
-    }
 
     if (isAdmin || isReceptionist || isPatient) {
         const finItems = [];
-        finItems.push({ to: '/dashboard/billing', icon: <DollarSign className="w-5 h-5" />, label: isPatient ? 'My Bills' : 'Billing Engine' });
+        if (isAdmin || isReceptionist || isPatient) {
+            finItems.push({ to: '/dashboard/billing', icon: <DollarSign className="w-5 h-5" />, label: isPatient ? 'My Bills' : 'Billing Engine' });
+        }
         if (isAdmin) {
             finItems.push({ to: '/dashboard/reports', icon: <BarChart3 className="w-5 h-5" />, label: 'Analytics' });
         }
-        groups.push({ title: 'Intelligence & Finance', items: finItems });
+        groups.push({ title: 'Finance & Governance', items: finItems });
     }
 
     return groups;
 };
+
+const LoadingState = () => (
+    <div className="flex flex-col items-center justify-center p-20 animate-pulse">
+        <div className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mb-4" style={{ borderColor: 'var(--luna-teal)', borderTopColor: 'transparent' }} />
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Synchronizing Institutional Terminal...</p>
+    </div>
+);
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -154,9 +163,9 @@ const Dashboard = () => {
             const unread = res.data.filter(n => !n.is_read).length;
             setUnreadCount(unread);
             if (unread > 0) {
-                document.title = `(${unread}) Lifeline HMS`;
+                document.title = `(${unread}) Lifeline • Staff Terminal`;
             } else {
-                document.title = `Lifeline HMS`;
+                document.title = `Lifeline • Staff Terminal`;
             }
         } catch (e) { }
     };
@@ -175,15 +184,15 @@ const Dashboard = () => {
                     interval = setInterval(fetchNotificationsGlobally, 45000);
                 }
             };
-            
+
             const handleReadAll = () => {
                 setUnreadCount(0);
-                document.title = 'Lifeline HMS';
+                document.title = 'Lifeline • Staff Terminal';
             };
             const handleReadSingle = () => {
                 setUnreadCount(p => {
                     const newCount = Math.max(0, p - 1);
-                    document.title = newCount > 0 ? `(${newCount}) Lifeline HMS` : 'Lifeline HMS';
+                    document.title = newCount > 0 ? `(${newCount}) Lifeline • Staff Terminal` : 'Lifeline • Staff Terminal';
                     return newCount;
                 });
             };
@@ -261,222 +270,226 @@ const Dashboard = () => {
     const isActive = (item) => item.exact
         ? location.pathname === item.to
         : location.pathname.startsWith(item.to) && item.to !== '/dashboard';
-
     return (
-        <div className="flex min-h-screen" style={{ background: 'var(--luna-bg)' }}>
+        <div data-role={user?.role?.toLowerCase() || 'admin'} className="flex min-h-screen" style={{ background: 'var(--luna-bg)' }}>
             <Toaster position="top-right" toastOptions={{ style: { borderRadius: '12px', fontWeight: 600, fontSize: '14px' } }} />
 
             {/* Sidebar */}
-            <>
-                {/* Mobile overlay */}
-                {sidebarOpen && <div className="fixed inset-0 z-30 md:hidden bg-black bg-opacity-50" onClick={() => setSidebarOpen(false)} />}
+            {user?.role?.toLowerCase() !== 'pharmacist' && (
+                <div className="flex">
+                    {/* Mobile overlay */}
+                    {sidebarOpen && <div className="fixed inset-0 z-30 md:hidden bg-black bg-opacity-50" onClick={() => setSidebarOpen(false)} />}
 
-                <aside className={`fixed left-0 top-0 h-screen w-72 flex flex-col z-40 transition-transform duration-300
-                                ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
-                    style={{
-                        background: 'var(--luna-card)',
-                        borderRight: '1px solid var(--luna-border)',
-                        boxShadow: '10px 0 50px rgba(0,0,0,0.02)'
-                    }}>
+                    <aside className={`fixed left-0 top-0 h-screen w-64 flex flex-col z-40 transition-transform duration-300
+                                    ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+                        style={{
+                            background: 'var(--luna-card)',
+                            borderRight: '1px solid var(--luna-border)',
+                            boxShadow: '10px 0 50px rgba(0,0,0,0.02)'
+                        }}>
 
-                    {/* Logo */}
-                    <div className="h-20 flex items-center justify-between px-6" style={{ borderBottom: '1px solid var(--luna-border)' }}>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-xl" style={{ background: 'rgba(30, 58, 138, 0.1)' }}>
-                                <HeartPulse className="w-5 h-5" style={{ color: LUNA.blue }} />
+                        {/* Logo Section - Detached Aesthetic */}
+                        <div className="pt-8 pb-6 flex items-center justify-between px-6 shrink-0" style={{ borderBottom: '1px solid var(--luna-border)' }}>
+                            <div className="flex items-center gap-3">
+                                <div className="p-0.5 rounded-2xl" style={{ background: 'rgba(30, 58, 138, 0.03)' }}>
+                                    <img src={logo} alt="Lifeline" className="w-9 h-9 object-contain drop-shadow-md" />
+                                </div>
+                                <div>
+                                    <p className="font-black text-[1.35rem] uppercase tracking-tighter" style={{ color: 'var(--luna-text-main)' }}>
+                                        Lifeline <span style={{ color: 'var(--luna-blue)' }}>HMS</span>
+                                    </p>
+                                    <p className="text-[8.5px] uppercase font-black tracking-[0.12em] opacity-60 mt-0.5" style={{ color: 'var(--luna-text-main)' }}>Hospital Management System</p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="font-extrabold text-base uppercase tracking-tighter" style={{ color: LUNA.blue }}>Lifeline</p>
-                                <p className="text-[9px] uppercase font-black tracking-widest" style={{ color: LUNA.teal }}>Intelligence</p>
-                            </div>
+                            <button className="md:hidden p-1" style={{ color: LUNA.sky }} onClick={() => setSidebarOpen(false)}>
+                                <X className="w-4 h-4" />
+                            </button>
                         </div>
-                        <button className="md:hidden p-1" style={{ color: LUNA.sky }} onClick={() => setSidebarOpen(false)}>
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
 
-                    {/* User Profile - Zero Noise Edition */}
-                    <div className="mx-6 mt-8 flex items-center gap-4 group cursor-pointer">
-                        <div className="relative">
-                            <div className="w-12 h-12 rounded-2xl avatar shadow-2xl ring-1 ring-white/10 group-hover:ring-blue-500/30 transition-all duration-300 flex items-center justify-center">
-                                <User className="w-6 h-6 text-white" strokeWidth={2.5} />
+                        {/* User Profile - Zero Noise Edition */}
+                        <div className="mx-6 mt-1 flex items-center gap-3 group cursor-pointer py-2 px-3 rounded-2xl transition-all hover:bg-[var(--luna-info-bg)] border border-transparent hover:border-[var(--luna-border)]">
+                            <div className="relative">
+                                <div className="w-11 h-11 rounded-xl avatar shadow-2xl ring-1 ring-[var(--luna-border)] group-hover:ring-[var(--luna-teal)] transition-all duration-300 flex items-center justify-center">
+                                    <User className="w-7 h-7 text-white" strokeWidth={2.5} />
+                                </div>
+                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 shadow-sm" style={{ background: 'var(--luna-success-text)', borderColor: 'var(--luna-bg)' }} />
                             </div>
-                            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-[3px] shadow-[0_0_10px_rgba(52,211,153,0.5)]" style={{ borderColor: 'var(--luna-bg)' }} />
-                        </div>
-                        <div className="flex flex-col justify-center">
-                            <p className="text-sm font-black uppercase tracking-wider group-hover:text-teal-400 transition-colors" style={{ color: 'var(--luna-text-main)' }}>
-                                {user?.first_name ? `${user.first_name}` : user?.role || 'ADMIN'}
-                            </p>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--luna-text-dim)' }}>Online</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Nav */}
-                    <nav className="sidebar-nav flex-grow px-4 py-4 space-y-4 overflow-y-auto mt-2">
-                        {getNavGroups(user?.role).map((group, gi) => (
-                            <div key={gi} className="space-y-1.5">
-                                <p className="text-[9px] uppercase font-bold tracking-[0.2em] px-4 py-1" style={{ color: 'var(--luna-text-dim)' }}>
-                                    {group.title}
+                            <div className="flex flex-col justify-center">
+                                <p className="text-[14.5px] font-black uppercase tracking-wider group-hover:text-[var(--luna-teal)] transition-colors" style={{ color: 'var(--luna-text-main)' }}>
+                                    {user?.first_name ? `${user.first_name}` : user?.role || 'ADMIN'}
                                 </p>
-                                {group.items.map(item => {
-                                    const active = isActive(item) || (item.exact && location.pathname === '/dashboard');
-                                    return (
-                                        <Link key={item.to} to={item.to}
-                                            className={`sidebar-link ${active ? 'active' : ''}`}
-                                            onClick={() => setSidebarOpen(false)}>
-                                            <div className="flex items-center gap-3">
-                                                {item.icon}
-                                                <span className="truncate">{item.label}</span>
-                                            </div>
-                                            <ChevronRight className={`w-3 h-3 transition-opacity ${active ? 'opacity-100' : 'opacity-0'}`} />
-                                        </Link>
-                                    );
-                                })}
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--luna-teal)' }}>Online</span>
+                                </div>
                             </div>
-                        ))}
-                    </nav>
+                        </div>
 
-                    {/* Bottom */}
-                    <div className="px-4 pb-6 space-y-1" style={{ borderTop: '1px solid rgba(167,235,242,0.08)' }}>
-                        <Link to="/dashboard/settings" className="sidebar-link mt-4">
-                            <div className="flex items-center gap-3"><Settings className="w-5 h-5" /><span>Settings</span></div>
-                        </Link>
-                        <button onClick={handleLogout} className="sidebar-link w-full text-left" style={{ color: 'var(--luna-text-muted)' }}>
-                            <div className="flex items-center gap-3"><LogOut className="w-5 h-5" /><span>Sign Out</span></div>
-                        </button>
-                    </div>
-                </aside>
-            </>
+                        {/* Nav */}
+                        <nav className="sidebar-nav flex-grow px-4 py-2 space-y-1 overflow-y-auto mt-2 custom-scrollbar">
+                            {getNavGroups(user?.role).map((group, gi) => (
+                                <div key={gi} className="space-y-0.5">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.25em] px-4 pt-4 pb-2 opacity-70 hover:opacity-100 transition-opacity" style={{ color: 'var(--luna-text-main)' }}>
+                                        {group.title}
+                                    </p>
+                                    {group.items.map(item => {
+                                        const active = isActive(item) || (item.exact && location.pathname === '/dashboard');
+                                        return (
+                                            <Link key={item.to} to={item.to}
+                                                className={`sidebar-link ${active ? 'active' : ''}`}
+                                                onClick={() => setSidebarOpen(false)}>
+                                                <div className="flex items-center gap-3">
+                                                    {item.icon}
+                                                    <span className="truncate">{item.label}</span>
+                                                </div>
+                                                <ChevronRight className={`w-3 h-3 transition-opacity ${active ? 'opacity-100' : 'opacity-0'}`} />
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                        </nav>
 
+                        {/* Bottom */}
+                        <div className="px-4 pb-6 pt-4 space-y-1" style={{ borderTop: '1px solid var(--luna-border)' }}>
+                            <Link to="/dashboard/settings" className="sidebar-link">
+                                <div className="flex items-center gap-3"><Settings className="w-4 h-4 opacity-70" /><span>Settings</span></div>
+                            </Link>
+                            <button onClick={handleLogout} className="sidebar-link w-full text-left">
+                                <div className="flex items-center gap-3 opacity-80 hover:opacity-100 transition-opacity" style={{ color: 'var(--luna-danger-text)' }}><LogOut className="w-4 h-4" /><span>Sign Out</span></div>
+                            </button>
+                        </div>
+                    </aside>
+                </div>
+            )}
             {/* Main */}
-            <div className="flex-grow md:ml-72 flex flex-col min-h-screen">
-                {/* Topbar */}
-                <header className="h-16 flex items-center justify-between px-6 sticky top-0 z-30"
+            <div className={`flex-grow flex flex-col h-screen overflow-hidden ${user?.role?.toLowerCase() !== 'pharmacist' ? 'md:ml-64' : ''}`}>
+                {/* Topbar - Floating Institutional Pill */}
+                <header className="mt-4 mx-6 rounded-2xl border flex items-center justify-between px-6 sticky top-4 z-30 shrink-0 h-16"
                     style={{
                         background: 'var(--luna-nav-bg)',
-                        backdropFilter: 'blur(20px)',
-                        borderBottom: '1px solid var(--luna-border)',
-                        boxShadow: '0 10px 40px rgba(0,0,0,0.02)'
+                        backdropFilter: 'blur(24px)',
+                        borderColor: 'var(--luna-border)',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.04)'
                     }}>
-                    <div className="flex items-center gap-4">
-                        <button className="md:hidden p-2 rounded-xl" onClick={() => setSidebarOpen(true)}
-                            style={{ color: LUNA.steel }}>
-                            <Menu className="w-5 h-5" />
-                        </button>
-                        <div className="relative hidden md:block">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: LUNA.blue }} />
-                            <input id="dashboard-search" type="text" placeholder="Search institutional database: records, staff, analytics..."
-                                className="input !pl-14 py-2 pr-4 text-sm w-96 h-10 shadow-inner" />
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 notranslate" translate="no">
-                        {/* Language Switcher */}
-                        <div className="relative" ref={langRef}>
-                            <button
-                                id="dash-lang-btn"
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all border"
-                                style={{
-                                    color: 'var(--luna-teal)',
-                                    background: langOpen ? 'rgba(56,189,248,0.1)' : 'rgba(46,196,182,0.05)',
-                                    borderColor: langOpen ? 'var(--luna-teal)' : 'var(--luna-border)',
-                                }}
-                                onClick={() => setLangOpen(!langOpen)}
-                                aria-label="Switch language">
-                                <Globe className="w-3.5 h-3.5" />
-                                <span>{currentLang.flag} {currentLang.label}</span>
-                                <ChevronDown className={`w-3 h-3 transition-transform ${langOpen ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            {langOpen && (
-                                <div className="absolute right-0 mt-2 w-52 rounded-2xl overflow-hidden z-50"
-                                    style={{
-                                        background: 'var(--luna-card)',
-                                        border: '1px solid var(--luna-border)',
-                                        boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-                                        backdropFilter: 'blur(20px)'
-                                    }}>
-                                    <div className="px-4 py-2 text-[8px] font-black uppercase tracking-[0.3em] opacity-40 border-b bg-white/5" style={{ borderColor: 'var(--luna-border)' }}>
-                                        Translation Hub
+                    
+                    {user?.role?.toLowerCase() === 'pharmacist' ? (
+                        <div className="flex items-center justify-between w-full h-full gap-4">
+                            <div className="flex-1 flex items-center justify-start min-w-0">
+                                <div className="flex items-center gap-3 pr-4 sm:pr-10 border-r border-dashed shrink-0" style={{ borderColor: 'var(--luna-border)' }}>
+                                    <div className="p-0.5 rounded-lg shrink-0" style={{ background: 'rgba(30, 58, 138, 0.05)' }}>
+                                        <img src={logo} alt="Lifeline" className="w-8 h-8 object-contain" />
                                     </div>
-                                    {LANGUAGES.map(lang => (
-                                        <button key={lang.code} id={`dash-lang-${lang.code}`}
-                                            className="w-full text-left px-4 py-2.5 text-xs font-bold flex items-center justify-between gap-2 transition-all hover:bg-white/5"
-                                            style={{
-                                                color: i18n.language === lang.code ? 'var(--luna-teal)' : 'var(--luna-text-muted)',
-                                                background: i18n.language === lang.code ? 'var(--luna-navy)' : 'transparent',
-                                            }}
-                                            onClick={() => switchLang(lang.code)}>
-                                            <div className="flex items-center gap-2">
-                                                <span>{lang.flag}</span>
-                                                <span>{lang.label}</span>
-                                            </div>
-                                            {i18n.language === lang.code && (
-                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
-                                            )}
-                                        </button>
-                                    ))}
+                                    <div className="hidden sm:block">
+                                        <div className="flex flex-col">
+                                            <p className="font-black text-base uppercase tracking-tighter leading-none" style={{ color: 'var(--luna-text-main)' }}>
+                                                LIFELINE <span style={{ color: 'var(--luna-blue)' }}>HMS</span>
+                                            </p>
+                                            <p className="font-bold text-[10px] uppercase tracking-[0.2em] opacity-40 mt-1" style={{ color: 'var(--luna-text-main)' }}>
+                                                Pharmacy Portal
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
-                            )}
+                            </div>
+                            
+                            <div className="flex-1 flex justify-center min-w-0">
+                                <nav className="flex items-center gap-2 sm:gap-4 overflow-x-auto no-scrollbar scroll-smooth">
+                                    {[
+                                        { to: '/dashboard/dispensary', label: 'Dispensary', icon: <Archive className="w-4 h-4"/> },
+                                        { to: '/dashboard/pharmacy', label: 'Inventory', icon: <Pill className="w-4 h-4"/> },
+                                        { to: '/dashboard/lab', label: 'Labs', icon: <FlaskConical className="w-4 h-4"/> }
+                                    ].map(link => {
+                                        const active = location.pathname.startsWith(link.to);
+                                        return (
+                                            <Link key={link.to} to={link.to} className={`flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${active ? 'shadow-sm border' : 'opacity-50 hover:opacity-100'}`}
+                                                style={active ? { background: 'var(--luna-info-bg)', color: 'var(--luna-teal)', borderColor: 'var(--luna-teal)' } : { color: 'var(--luna-text-main)' }}>
+                                                {link.icon} <span>{link.label}</span>
+                                            </Link>
+                                        );
+                                    })}
+                                </nav>
+                            </div>
+                            
+                            <div className="flex-1 flex items-center justify-end gap-3 shrink-0">
+                                <button onClick={toggleTheme} className="w-10 h-10 rounded-xl flex items-center justify-center transition-all border shrink-0" style={{ color: 'var(--luna-teal)', borderColor: 'var(--luna-border)' }}>
+                                    {theme === 'dark' ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
+                                </button>
+                                <Link to="/dashboard/notifications" className="w-10 h-10 rounded-xl flex items-center justify-center transition-all border shrink-0 relative" style={{ color: 'var(--luna-teal)', borderColor: 'var(--luna-border)' }}>
+                                    <Bell className="w-4.5 h-4.5" />
+                                    <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 border-2" style={{ borderColor: 'var(--luna-nav-bg)' }} />
+                                </Link>
+                                <button onClick={handleLogout} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl transition-all bg-red-600 shrink-0">
+                                    <LogOut className="w-4 h-4" /> <span className="hidden xl:inline">Sign Out</span>
+                                </button>
+                            </div>
                         </div>
-
-                        <button onClick={toggleTheme}
-                            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:bg-white/10"
-                            style={{ background: 'rgba(46,196,182,0.08)', color: 'var(--luna-teal)' }}
-                            aria-label="Toggle theme">
-                            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                        </button>
-                        <div className="badge-live hidden md:flex">
-                            <span className="w-2 h-2 rounded-full bg-current animate-ping" /> AI Core Active
+                    ) : (
+                        <div className="flex items-center justify-between w-full h-full">
+                            <div className="flex items-center gap-4">
+                                <button className="md:hidden p-2 rounded-xl" onClick={() => setSidebarOpen(true)} style={{ color: 'var(--luna-steel)' }}><Menu className="w-5 h-5" /></button>
+                                <div className="relative hidden md:block">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--luna-blue)' }} />
+                                    <input id="dashboard-search" type="text" placeholder="Search institutional database..." className="input !pl-14 py-2 pr-4 text-sm w-80 h-9 shadow-inner" />
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 notranslate" translate="no">
+                                <div className="relative" ref={langRef}>
+                                    <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all border" style={{ color: 'var(--luna-teal)', background: langOpen ? 'var(--luna-info-bg)' : 'transparent', borderColor: langOpen ? 'var(--luna-teal)' : 'var(--luna-border)' }} onClick={() => setLangOpen(!langOpen)}>
+                                        <Globe className="w-3.5 h-3.5" /> <span>{currentLang.flag} {currentLang.label}</span> <ChevronDown className={`w-3 h-3 transition-transform ${langOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {langOpen && (
+                                        <div className="absolute right-0 mt-2 w-52 rounded-2xl overflow-hidden z-50 shadow-2xl border" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                                            <div className="px-4 py-2 text-[8px] font-black uppercase tracking-[0.3em] opacity-40 border-b" style={{ borderColor: 'var(--luna-border)' }}>Translation Hub</div>
+                                            {LANGUAGES.map(lang => (
+                                                <button key={lang.code} className="w-full text-left px-4 py-2.5 text-xs font-bold flex items-center justify-between gap-2 transition-all hover:bg-[var(--luna-info-bg)]" style={{ color: i18n.language === lang.code ? 'var(--luna-teal)' : 'var(--luna-text-muted)', background: i18n.language === lang.code ? 'var(--luna-navy)' : 'transparent' }} onClick={() => switchLang(lang.code)}>
+                                                    <div className="flex items-center gap-2"><span>{lang.flag}</span> <span>{lang.label}</span></div>
+                                                    {i18n.language === lang.code && <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--luna-blue)' }} />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <button onClick={toggleTheme} className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:bg-[var(--luna-border)]" style={{ background: 'var(--luna-info-bg)', color: 'var(--luna-teal)' }}>{theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}</button>
+                                <div className="badge-live hidden md:flex h-8"><span className="w-2 h-2 rounded-full bg-current animate-ping" /> AI Core Active </div>
+                                <Link to="/dashboard/notifications" className="w-8 h-8 rounded-xl flex items-center justify-center relative transition-all hover:bg-[var(--luna-border)]" style={{ background: 'var(--luna-info-bg)', color: 'var(--luna-text-muted)' }}>
+                                    <Bell className="w-4 h-4" />
+                                    {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-white text-[8px] font-black flex items-center justify-center" style={{ background: 'var(--luna-danger-text)' }}>{unreadCount}</span>}
+                                </Link>
+                            </div>
                         </div>
-                        <Link to="/dashboard/notifications"
-                            className="w-10 h-10 rounded-xl flex items-center justify-center relative transition-all hover:bg-white/10"
-                            style={{ background: 'rgba(46,196,182,0.08)', color: 'var(--luna-text-muted)' }}>
-                            <Bell className="w-5 h-5" />
-                            <AnimatePresence>
-                                {unreadCount > 0 && (
-                                    <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
-                                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-white text-[10px] font-black flex items-center justify-center shadow-[0_0_12px_rgba(239,68,68,0.8)]"
-                                        style={{ background: '#ef4444' }}>
-                                        {unreadCount > 99 ? '99+' : unreadCount}
-                                    </motion.span>
-                                )}
-                            </AnimatePresence>
-                        </Link>
-                    </div>
+                    )}
                 </header>
 
-                {/* Content */}
-                <main className="flex-grow p-6 lg:p-8 overflow-y-auto">
+                {/* Content Area - SCROLLABLE COMPARTMENT */}
+                <main className="flex-grow overflow-y-auto px-6 py-6 custom-scrollbar pb-24">
                     {loading ? (
                         <div className="flex items-center justify-center h-full">
                             <div className="animate-pulse flex flex-col items-center">
-                                <div className="w-12 h-12 rounded-full border-4 border-teal-500 border-t-transparent animate-spin mb-4" />
+                                <div className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mb-4" style={{ borderColor: 'var(--luna-teal)', borderTopColor: 'transparent' }} />
                                 <p className="font-bold text-sm" style={{ color: 'var(--luna-text-muted)' }}>Synchronizing Clinical Environment...</p>
                             </div>
                         </div>
                     ) : (
-                        <AnimatePresence mode="wait">
-                            <Suspense fallback={<div className="flex items-center justify-center p-12"><div className="animate-pulse flex flex-col items-center"><div className="w-8 h-8 rounded-full border-2 border-teal-500 border-t-transparent animate-spin mb-2" /></div></div>}><Routes location={location} key={location.pathname}>
-                                <Route path="/" element={<Overview user={user} />} />
-                                <Route path="/doctors" element={<ResourceList type="doctors" title="Medical Specialists" user={user} />} />
-                                <Route path="/patients" element={<ResourceList type="patients" title="Patient Registry" user={user} />} />
-                                <Route path="/appointments" element={<AppointmentList user={user} />} />
-                                <Route path="/billing" element={<BillingPage user={user} />} />
-                                <Route path="/records" element={<RecordsPage user={user} />} />
-                                <Route path="/telemedicine" element={<TelemedicinePage user={user} />} />
+                        <Routes location={location} key={location.pathname}>
+                                <Route path="/" element={user?.role?.toLowerCase() === 'pharmacist' ? <Navigate to="/dashboard/dispensary" replace /> : <Overview user={user} />} />
+                                <Route path="/doctors" element={<Suspense fallback={null}><ResourceList type="doctors" title="Medical Specialists" user={user} /></Suspense>} />
+                                <Route path="/patients" element={<Suspense fallback={<LoadingState />}><ResourceList type="patients" title="Patient Registry" user={user} /></Suspense>} />
+                                <Route path="/appointments" element={<Suspense fallback={<LoadingState />}><AppointmentList user={user} /></Suspense>} />
+                                <Route path="/admissions" element={<Suspense fallback={<LoadingState />}><AdmissionsPage user={user} /></Suspense>} />
+                                <Route path="/billing" element={<Suspense fallback={<LoadingState />}><BillingPage user={user} /></Suspense>} />
+                                <Route path="/records" element={<Suspense fallback={<LoadingState />}><RecordsPage user={user} /></Suspense>} />
+                                <Route path="/telemedicine" element={<Suspense fallback={<LoadingState />}><TelemedicinePage user={user} /></Suspense>} />
                                 <Route path="/pharmacy" element={<PharmacyPage user={user} />} />
-                                <Route path="/lab" element={<LabPage user={user} />} />
-                                <Route path="/notifications" element={<NotificationsPage user={user} />} />
-                                <Route path="/reports" element={<ReportsPage user={user} />} />
-                                <Route path="/tasks" element={<TaskPage user={user} />} />
-                                <Route path="/settings" element={<SettingsPage user={user} onUpdate={async () => {
+                                <Route path="/dispensary" element={<DispensaryPage user={user} />} />
+                                <Route path="/lab" element={<Suspense fallback={<LoadingState />}><LabPage user={user} /></Suspense>} />
+                                <Route path="/ai" element={<Suspense fallback={<LoadingState />}><AIPage user={user} /></Suspense>} />
+                                <Route path="/notifications" element={<Suspense fallback={null}><NotificationsPage user={user} /></Suspense>} />
+                                <Route path="/reports" element={<Suspense fallback={null}><ReportsPage user={user} /></Suspense>} />
+                                <Route path="/settings" element={<Suspense fallback={null}><SettingsPage user={user} onUpdate={async () => {
                                     const res = await api.get('me/');
                                     setUser(res.data);
-                                }} />} />
-                            </Routes></Suspense>
-                        </AnimatePresence>
+                                }} /></Suspense>} />
+                            </Routes>
                     )}
                 </main>
             </div>

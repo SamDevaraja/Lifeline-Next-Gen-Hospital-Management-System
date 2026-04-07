@@ -1,16 +1,31 @@
 from rest_framework import serializers  # type: ignore
 from django.contrib.auth.models import User  # type: ignore
-from hospital.models import (  # type: ignore
-    Doctor, Patient, Appointment,
-    MedicalRecord, AIDiagnosis, Bill, Notification, PharmacyItem,
-    TelemedSession, LabTest, Prescription, PharmacyOrder, CleaningTask
+from hospital.models import (
+    Doctor, Patient, Appointment, MedicalRecord, 
+    Bill, Notification, PharmacyItem, TeleConsultationSession, 
+    MeetingParticipant, LabTest, Prescription, PharmacyOrder, UserProfile
 )
 
 
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['role', 'phone', 'created_at']
+
 class UserSerializer(serializers.ModelSerializer):
+    profile = UserProfileSerializer(read_only=True)
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email']
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'profile', 'is_staff', 'is_active']
+
+class StaffUserSerializer(serializers.ModelSerializer):
+    """Refined serializer for clinical workforce management."""
+    role = serializers.CharField(source='profile.role', read_only=True)
+    phone = serializers.CharField(source='profile.phone', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role', 'phone', 'is_active', 'date_joined']
 
 
 
@@ -23,7 +38,7 @@ class DoctorSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'profile_pic', 'address', 'mobile', 'department',
             'qualification', 'experience_years', 'consultation_fee', 'status',
-            'available_days', 'bio', 'get_name', 'created_at'
+            'available_days', 'bio', 'get_name', 'created_at', 'permanent_meet_link'
         ]
 
 
@@ -60,6 +75,10 @@ class DoctorCreateSerializer(serializers.ModelSerializer):
             last_name=validated_data.pop('last_name'),
             email=validated_data.pop('email'),
         )
+        # Ensure the UserProfile role matches
+        from hospital.models import UserProfile
+        UserProfile.objects.update_or_create(user=user, defaults={'role': 'doctor'})
+        
         return Doctor.objects.create(user=user, **validated_data)
 
 
@@ -126,12 +145,14 @@ class AppointmentSerializer(serializers.ModelSerializer):
     patientName = serializers.ReadOnlyField(source='patient.get_name')
     doctorName = serializers.ReadOnlyField(source='doctor.get_name')
 
+    doctor_permanent_link = serializers.ReadOnlyField(source='doctor.permanent_meet_link')
+    
     class Meta:
         model = Appointment
         fields = [
             'id', 'patient', 'doctor', 'patientName', 'doctorName',
             'appointment_date', 'appointment_time', 'description', 'status', 'priority', 'notes',
-            'meeting_link', 'created_at', 'updated_at'
+            'meeting_link', 'doctor_permanent_link', 'created_at', 'updated_at'
         ]
 
 
@@ -150,10 +171,8 @@ class MedicalRecordSerializer(serializers.ModelSerializer):
         return obj.doctor.get_name if obj.doctor else None
 
 
-class AIDiagnosisSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AIDiagnosis
-        fields = '__all__'
+
+
 
 
 class BillSerializer(serializers.ModelSerializer):
@@ -177,20 +196,31 @@ class PharmacyOrderSerializer(serializers.ModelSerializer):
         model = PharmacyOrder
         fields = '__all__'
 
-class CleaningTaskSerializer(serializers.ModelSerializer):
+
+
+
+class MeetingParticipantSerializer(serializers.ModelSerializer):
+    username = serializers.ReadOnlyField(source='user.username')
+    user_name = serializers.ReadOnlyField(source='user.get_full_name')
+    
     class Meta:
-        model = CleaningTask
-        fields = '__all__'
+        model = MeetingParticipant
+        fields = ['session', 'user', 'role', 'username', 'user_name', 'joined_at']
 
-
-
-class TelemedSessionSerializer(serializers.ModelSerializer):
+class TeleConsultationSessionSerializer(serializers.ModelSerializer):
     patient_name = serializers.ReadOnlyField(source='patient.get_name')
-    doctor_name = serializers.ReadOnlyField(source='doctor.get_name')
+    created_by_name = serializers.ReadOnlyField(source='created_by.get_name')
+    created_by_id = serializers.ReadOnlyField(source='created_by.id')
+    participants = MeetingParticipantSerializer(many=True, read_only=True)
+    doctor_permanent_link = serializers.ReadOnlyField(source='created_by.permanent_meet_link')
 
     class Meta:
-        model = TelemedSession
-        fields = '__all__'
+        model = TeleConsultationSession
+        fields = [
+            'id', 'appointment', 'patient', 'patient_name', 
+            'created_by', 'created_by_name', 'created_by_id', 'doctor_permanent_link',
+            'token', 'meeting_link', 'status', 'participants', 'created_at'
+        ]
 
 
 class LabTestSerializer(serializers.ModelSerializer):
@@ -227,7 +257,7 @@ class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     first_name = serializers.CharField(max_length=50)
     last_name = serializers.CharField(max_length=50)
-    role = serializers.ChoiceField(choices=['patient', 'doctor', 'admin'])
+    role = serializers.ChoiceField(choices=['patient', 'doctor', 'admin', 'receptionist', 'pharmacist'])
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
     address = serializers.CharField(max_length=200, required=False, allow_blank=True)
     department = serializers.CharField(max_length=60, required=False, allow_blank=True)
@@ -260,7 +290,6 @@ class DashboardStatsSerializer(serializers.Serializer):
     total_appointments = serializers.IntegerField()
     pending_appointments = serializers.IntegerField()
     total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
-    ai_diagnoses_today = serializers.IntegerField()
 
 from dj_rest_auth.serializers import PasswordResetSerializer  # type: ignore
 from django.conf import settings  # type: ignore

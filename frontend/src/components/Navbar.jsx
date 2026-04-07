@@ -4,6 +4,7 @@ import { HeartPulse, LayoutDashboard, BrainCircuit, Menu, X, Globe, ChevronDown,
 import { useTranslation } from 'react-i18next';
 import { LANGUAGES } from '../i18n/index.js';
 import { useTheme } from '../context/ThemeContext';
+import logo from '/lifeline_themed_v1.svg?v=cachebust123';
 
 const LUNA = {
     sky: 'var(--luna-teal)', teal: 'var(--luna-blue)', steel: 'var(--luna-steel)', navy: 'var(--luna-navy)', dark: 'var(--luna-bg)'
@@ -78,10 +79,9 @@ const Navbar = () => {
             <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
                 {/* Logo */}
                 <Link to="/" className="flex items-center gap-3 group">
-                    <div className="p-2.5 rounded-xl transition-all group-hover:scale-110"
-                        style={{ background: 'rgba(46,196,182,0.15)' }}>
-                        <HeartPulse className="w-6 h-6" style={{ color: LUNA.sky }}
-                            strokeWidth={2.5} />
+                    <div className="p-0.5 rounded-2xl transition-all group-hover:scale-110"
+                        style={{ background: 'rgba(46,196,182,0.03)' }}>
+                        <img src={logo} alt="Lifeline Logo" className="w-11 h-11 object-contain drop-shadow-2xl" />
                     </div>
                     <div className="flex flex-col leading-none">
                         <span className="text-xl font-extrabold tracking-tight" style={{ color: LUNA.sky }}>
@@ -180,7 +180,8 @@ const Navbar = () => {
 
                     {/* Auth Buttons */}
                     {isLoggedIn ? (
-                        <Link to="/dashboard" id="nav-dashboard-btn" className="btn-teal text-sm px-5 py-2.5">
+                        <Link to={JSON.parse(localStorage.getItem('lifeline-user') || '{}').role === 'patient' ? '/patient/dashboard' : '/dashboard'} 
+                            id="nav-dashboard-btn" className="btn-teal text-sm px-5 py-2.5">
                             <LayoutDashboard className="w-4 h-4" /> {t('dashboard')}
                         </Link>
                     ) : (
@@ -192,7 +193,7 @@ const Navbar = () => {
                                 onMouseOut={e => { e.currentTarget.style.color = 'var(--luna-text-main)'; e.currentTarget.style.background = 'transparent'; }}>
                                 {t('signIn')}
                             </Link>
-                            <Link to="/signup" id="nav-register-btn" className="btn-teal text-sm px-5 py-2.5">
+                            <Link to="/patient/signup" id="nav-register-btn" className="btn-teal text-sm px-5 py-2.5">
                                 {t('register')}
                             </Link>
                         </>
@@ -235,11 +236,12 @@ const Navbar = () => {
                                 ))}
                             </div>
                             {isLoggedIn ? (
-                                <Link to="/dashboard" className="btn-teal w-full text-sm">{t('dashboard')}</Link>
+                                <Link to={JSON.parse(localStorage.getItem('lifeline-user') || '{}').role === 'patient' ? '/patient/dashboard' : '/dashboard'} 
+                                    className="btn-teal w-full text-sm">{t('dashboard')}</Link>
                             ) : (
                                 <>
                                     <Link to="/login" className="block text-center font-bold py-2" style={{ color: 'var(--luna-text-main)' }}>{t('signIn')}</Link>
-                                    <Link to="/signup" className="btn-teal w-full text-sm">{t('register')}</Link>
+                                    <Link to="/patient/signup" className="btn-teal w-full text-sm">{t('register')}</Link>
                                 </>
                             )}
                         </div>

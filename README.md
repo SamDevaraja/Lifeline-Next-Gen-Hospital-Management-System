@@ -1,6 +1,6 @@
 # 🏥 Lifeline • Clinical Command Dashboard
 
-**Lifeline** is an elite, high-fidelity Hospital Management System (HMS) designed for modern clinical operations. Powered by a neural AI core and built on a decoupled full-stack architecture, Lifeline provides a premium, data-driven ecosystem for medical professionals and patients alike.
+**Lifeline** is an elite, high-fidelity Hospital Management System (HMS) designed for modern clinical operations. Built on a decoupled full-stack architecture, Lifeline operates as a stable, zero-noise, physician-led clinical workstation. It provides a premium, data-driven ecosystem featuring unified patient-doctor connectivity and 16 high-fidelity clinical modules.
 
 ---
 
@@ -10,21 +10,25 @@ Lifeline is engineered for performance, security, and scalability:
 
 *   **Frontend**: React 18+ (Vite) / Tailwind CSS / Framer Motion
 *   **Backend**: Django 5.2 / Django REST Framework (DRF)
-*   **Intelligence**: Google Gemini AI Integration (via Secure Proxy)
+*   **Telemedicine**: Standardized Google Meet (GMeet) protocol for secure patient-doctor connectivity
 *   **Database**: PostgreSQL (Neon DB) / SQLite (Fallback)
 *   **Security**: Token-based Authentication via `dj-rest-auth` & `allauth`
 *   **Reporting**: ReportLab PDF Engine
 
 ---
 
-## 🚀 Key Modules & Intelligence
+## 🚀 Key Modules & Clinical Workflows
 
-### 🧠 Lifeline Neural Core (AI Agent)
-The built-in AI assistant processes natural language commands to streamline clinical workflows:
-- **Smart Rescheduling**: Move appointments via simple chat commands.
-- **Risk Assessment**: Analyze patient data to identify high-risk clinical profiles.
-- **Diagnostic Assistant**: symptom-based differential diagnosis suggestions.
-- **Resource Queries**: Instant check for doctor availability and department status.
+### 🏥 16 High-Fidelity Clinical Modules
+Comprehensive management across all hospital departments with zero-noise data flow:
+- **High-Fidelity Records**: Non-placeholder clinical records spanning extensive clinical workflows.
+- **Unified Navigation**: Optimized UI for a manual, professional, physician-led environment.
+
+### 🩺 Telemedicine & Patient Connectivity
+Secure, real-time live consultations:
+- **GMeet Integration**: Secure virtual consultation session initiation seamlessly integrated into the Telemedicine Terminal.
+- **Patient Portal Synchronization**: Direct connectivity between the patient's portal and the doctor's workstation.
+- **Workflow Finalization**: Seamless transition from live consultation directly to clinical record finalization.
 
 ### 📊 Clinical Command Dashboard
 Real-time operational visibility for Administrators and Doctors:
@@ -59,9 +63,25 @@ pip install -r requirements.txt
 # Database initialization
 python manage.py migrate
 
-# Launch the Neural API
+# Launch the Backend API
 python manage.py runserver
 ```
+
+### 🔐 Permanent Login Credentials (Testing Environment)
+
+These default accounts are hardcoded for consistent dev testing and will remain permanently active in the system:
+
+| Role | Username | Password | Targeted Portal Access |
+| :--- | :--- | :--- | :--- |
+| **Administrator** | `test_admin` | `admin123` | [Clinical Portal](http://localhost:5173/login) |
+| **Physician** | `test_doctor` | `doctor123` | [Clinical Portal](http://localhost:5173/login) |
+| **Pharmacist** | `test_pharmacist` | `pharmacist123` | [Clinical Portal](http://localhost:5173/login) |
+| **Receptionist** | `test_receptionist` | `receptionist123`| [Clinical Portal](http://localhost:5173/login) |
+| **Patient** | `test_patient` | `patient123` | [Patient Terminal](http://localhost:5173/patient/login) |
+
+> [!IMPORTANT]
+> **HIPAA Role Separation:** Internal staff (Admins, Doctors, etc.) MUST use the main `/login` URL. Patients must use the `/patient/login` terminal. Cross-role authentication will trigger a "Secure Access Violation" alert.
+
 
 ### 2. Frontend Application (React)
 Ensure you have Node.js 18+ installed.

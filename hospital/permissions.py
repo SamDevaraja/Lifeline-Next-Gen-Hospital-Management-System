@@ -35,11 +35,11 @@ class RBACPermission(permissions.BasePermission):
             return True
 
         if role == 'doctor':
-            allowed_views = ['PatientViewSet', 'PrescriptionViewSet', 'AppointmentViewSet', 'MedicalRecordViewSet', 'TelemedSessionViewSet', 'LabTestViewSet', 'DoctorViewSet']
+            allowed_views = ['PatientViewSet', 'PrescriptionViewSet', 'AppointmentViewSet', 'MedicalRecordViewSet', 'TeleConsultationViewSet', 'LabTestViewSet', 'DoctorViewSet']
             return view_name in allowed_views
 
         if role == 'patient':
-            allowed_views = ['AppointmentViewSet', 'PrescriptionViewSet', 'MedicalRecordViewSet', 'BillViewSet', 'NotificationViewSet', 'PatientViewSet', 'DoctorViewSet']
+            allowed_views = ['AppointmentViewSet', 'PrescriptionViewSet', 'MedicalRecordViewSet', 'BillViewSet', 'NotificationViewSet', 'PatientViewSet', 'DoctorViewSet', 'TeleConsultationViewSet']
             return view_name in allowed_views
             
         if role == 'receptionist':
@@ -47,15 +47,7 @@ class RBACPermission(permissions.BasePermission):
             return view_name in allowed_views
             
         if role == 'pharmacist':
-            allowed_views = ['PrescriptionViewSet', 'PharmacyItemViewSet', 'PharmacyOrderViewSet']
-            return view_name in allowed_views
-            
-        if role == 'nurse':
-            allowed_views = ['PatientViewSet', 'MedicalRecordViewSet', 'LabTestViewSet', 'DoctorViewSet']
-            return view_name in allowed_views
-            
-        if role == 'supervisor':
-            allowed_views = ['CleaningTaskViewSet']
+            allowed_views = ['PrescriptionViewSet', 'PharmacyItemViewSet', 'PharmacyOrderViewSet', 'LabTestViewSet', 'PatientViewSet']
             return view_name in allowed_views
             
         # Default block if not mapped
@@ -78,9 +70,24 @@ class RBACPermission(permissions.BasePermission):
                 return obj.patientId == request.user.patient.id
             return False
             
+        view_name = view.__class__.__name__
+
         if role == 'doctor':
-             # Optionally strict boundary for Doctors accessing only their assigned patients?
-             # For now, let doctors see patients globally, but they might only edit their own.
-             pass
+            # Doctors can only access patients assigned to them or clinical records they created
+            doctor_profile = getattr(request.user, 'doctor', None)
+            if not doctor_profile:
+                return False
+                
+            if view_name == 'PatientViewSet':
+                return obj.assigned_doctor == doctor_profile
+                
+            if hasattr(obj, 'doctor'):
+                return obj.doctor == doctor_profile
+                
+            if hasattr(obj, 'patient'):
+                # Allow access if the patient in the record is assigned to this doctor
+                return obj.patient.assigned_doctor == doctor_profile
+                
+            return True
 
         return True

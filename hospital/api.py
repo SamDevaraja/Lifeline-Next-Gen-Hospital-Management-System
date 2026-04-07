@@ -1,4 +1,6 @@
 from rest_framework import viewsets, permissions, status
+from django.db import transaction
+import uuid
 from hospital.permissions import RBACPermission  # type: ignore
 from rest_framework.response import Response  # type: ignore
 from django.http import HttpResponse  # type: ignore
@@ -9,16 +11,16 @@ from django.utils import timezone  # type: ignore
 from django.db.models import Sum, Count, Q  # type: ignore
 from hospital.models import (  # type: ignore
     Doctor, Patient, Appointment,
-    MedicalRecord, AIDiagnosis, Bill, Notification, PharmacyItem,
-    TelemedSession, LabTest, Prescription, PharmacyOrder, CleaningTask
+    MedicalRecord, Bill, Notification, PharmacyItem,
+    TeleConsultationSession, MeetingParticipant, LabTest, Prescription, PharmacyOrder, UserProfile
 )
 from hospital.serializers import (  # type: ignore
     UserSerializer, DoctorSerializer, DoctorCreateSerializer,
     PatientSerializer, PatientCreateSerializer, AppointmentSerializer,
-    MedicalRecordSerializer, AIDiagnosisSerializer, BillSerializer,
+    MedicalRecordSerializer, BillSerializer,
     NotificationSerializer, RegisterSerializer, DashboardStatsSerializer, PharmacyItemSerializer,
-    TelemedSessionSerializer, LabTestSerializer, PrescriptionSerializer,
-    PharmacyOrderSerializer, CleaningTaskSerializer
+    TeleConsultationSessionSerializer, MeetingParticipantSerializer, LabTestSerializer, PrescriptionSerializer,
+    PharmacyOrderSerializer, StaffUserSerializer
 )
 import re
 import json
@@ -33,6 +35,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle  # type: ig
 from django.shortcuts import redirect # type: ignore
 from django.conf import settings # type: ignore
 
+# ─── Auth Views ───────────────────────────────────────────────
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def confirm_email_redirect(request, key):
@@ -44,8 +47,16 @@ def confirm_email_redirect(request, key):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
-    """Register a new user (patient, doctor, or admin)."""
-    serializer = RegisterSerializer(data=request.data)
+    """Register a new user (patient or other public user)."""
+    # Only patients and other non-staff roles can register publicly.
+    # Doctors and Admins are created exclusively by existing administrators.
+    data = request.data
+    role = data.get('role', 'patient').lower()
+    
+    if role in ['doctor', 'admin', 'administrator', 'pharmacist', 'receptionist']:
+        return Response({'error': f'Clinical {role} registration is restricted. Please contact the institutional administrator for internal credentials.'}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = RegisterSerializer(data=data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -58,17 +69,7 @@ def register_user(request):
         last_name=data['last_name'],
     )
 
-    role = data.get('role', 'patient')
-
-    if role == 'doctor':
-        Doctor.objects.create(
-            user=user,
-            address=data.get('address', ''),
-            mobile=data.get('phone', ''),
-            department=data.get('department', 'Cardiologist'),
-            status=False,  # Requires admin approval
-        )
-    elif role == 'patient':
+    if role == 'patient':
         Patient.objects.create(
             user=user,
             address=data.get('address', ''),
@@ -79,10 +80,14 @@ def register_user(request):
 
     # Set email as verified directly since verification is disabled
     from allauth.account.models import EmailAddress  # type: ignore
-    
     EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=True)
+    
+    # Ensure the UserProfile role matches the requested role
+    if hasattr(user, 'profile'):
+        user.profile.role = role
+        user.profile.save()
 
-    return Response({'message': 'Registration successful.'}, status=status.HTTP_201_CREATED)
+    return Response({'message': 'Registration successful. Please wait for clinical approval.'}, status=status.HTTP_201_CREATED)
 
 
 import random
@@ -144,22 +149,60 @@ from django.core.cache import cache  # type: ignore
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
-    """Return aggregated dashboard statistics."""
-    stats = cache.get('dashboard_stats')
+    """Return aggregated dashboard statistics personalized for the user role."""
+    user = request.user
+    role = 'admin' if user.is_staff else getattr(user, 'profile', None) and user.profile.role or 'patient'
+    
+    if hasattr(user, 'doctor'):
+        role = 'doctor'
+    elif hasattr(user, 'patient'):
+        role = 'patient'
+
+    cache_key = f'dashboard_stats_{role}_{user.id}'
+    stats = cache.get(cache_key)
+    
     if not stats:
         today = timezone.now().date()
-        stats = {
-            'total_doctors': Doctor.objects.filter(status=True, is_deleted=False).count(),
-            'total_patients': Patient.objects.filter(status=True, is_deleted=False).count(),
-            'total_appointments': Appointment.objects.filter(patient__is_deleted=False, doctor__is_deleted=False).count(),
-            'pending_appointments': Appointment.objects.filter(status='pending', patient__is_deleted=False, doctor__is_deleted=False).count(),
-            'today_appointments': Appointment.objects.filter(appointment_date=today, patient__is_deleted=False, doctor__is_deleted=False).count(),
-            'total_revenue': float(Bill.objects.filter(status='paid', patient__is_deleted=False).aggregate(t=Sum('total_amount'))['t'] or 0),
-            'pending_bills': Bill.objects.filter(status='pending', patient__is_deleted=False).count(),
-            'ai_diagnoses_today': AIDiagnosis.objects.filter(created_at__date=today, patient__is_deleted=False).count(),
-            'high_risk_patients': Patient.objects.filter(risk_level__in=['high', 'critical'], is_deleted=False).count(),
-        }
-        cache.set('dashboard_stats', stats, 60)  # Cache for 60 seconds
+        
+        if role == 'admin' or user.is_staff:
+            stats = {
+                'total_doctors': Doctor.objects.filter(status=True, is_deleted=False).count(),
+                'total_patients': Patient.objects.filter(status=True, is_deleted=False).count(),
+                'total_appointments': Appointment.objects.filter(patient__is_deleted=False, doctor__is_deleted=False).count(),
+                'pending_appointments': Appointment.objects.filter(status='pending', patient__is_deleted=False, doctor__is_deleted=False).count(),
+                'today_appointments': Appointment.objects.filter(appointment_date=today, patient__is_deleted=False, doctor__is_deleted=False).count(),
+                'total_revenue': float(Bill.objects.filter(status='paid', patient__is_deleted=False).aggregate(t=Sum('total_amount'))['t'] or 0),
+                'pending_bills': Bill.objects.filter(status='pending', patient__is_deleted=False).count(),
+                'high_risk_patients': Patient.objects.filter(risk_level__in=['high', 'critical'], is_deleted=False).count(),
+                'lab_tests_today': LabTest.objects.filter(test_date__date=today).count(),
+            }
+        elif role == 'doctor':
+            doc = user.doctor
+            stats = {
+                'total_patients': Patient.objects.filter(assigned_doctor=doc, is_deleted=False).count(),
+                'total_appointments': Appointment.objects.filter(doctor=doc).count(),
+                'pending_appointments': Appointment.objects.filter(doctor=doc, status='pending').count(),
+                'today_appointments': Appointment.objects.filter(doctor=doc, appointment_date=today).count(),
+                'high_risk_patients': Patient.objects.filter(assigned_doctor=doc, risk_level__in=['high', 'critical'], is_deleted=False).count(),
+                'lab_tests_pending': LabTest.objects.filter(patient__assigned_doctor=doc).count(),
+                'ai_diagnoses_today': Patient.objects.filter(assigned_doctor=doc, risk_level__in=['high', 'critical'], is_deleted=False).count(),
+            }
+        elif role == 'patient':
+            pat = user.patient
+            stats = {
+                'my_appointments': Appointment.objects.filter(patient=pat).count(),
+                'pending_bills': Bill.objects.filter(patient=pat, status='pending').count(),
+                'total_records': MedicalRecord.objects.filter(patient=pat).count(),
+                'latest_risk_level': pat.risk_level,
+            }
+        else:
+            # Fallback for other staff roles
+            stats = {
+                'total_patients': Patient.objects.filter(is_deleted=False).count(),
+                'today_appointments': Appointment.objects.filter(appointment_date=today).count(),
+            }
+            
+        cache.set(cache_key, stats, 60)  # Cache for 60 seconds
     return Response(stats)
 
 
@@ -189,6 +232,14 @@ def me(request):
         user.save()
         
         # Update Profile/Role models
+        from hospital.models import UserProfile
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        profile.phone = data.get('phone', profile.phone)
+        profile.address = data.get('address', profile.address)
+        profile.bio = data.get('bio', profile.bio)
+        profile.symptoms = data.get('symptoms', profile.symptoms)
+        profile.save()
+
         if hasattr(user, 'doctor'):
             doc = user.doctor
             doc.mobile = data.get('phone', doc.mobile)
@@ -205,19 +256,31 @@ def me(request):
         cache.delete(f'user_me_{user.id}')
         
     # Try to serve from cache for GET requests
+    # Neural Cache Protection
     cache_key = f'user_me_{user.id}'
-    if request.method == 'GET':
-        cached = cache.get(cache_key)
-        if cached:
-            return Response(cached)
+    # Bypass triggered for clinical identity synchronization
+    # cached = cache.get(cache_key)
+    # if cached: return Response(cached)
 
-    role = 'admin' if user.is_staff else getattr(user, 'profile', None) and user.profile.role or 'patient'
+    # Identify actual clinical role (Physical role > Staff flag)
+    if hasattr(user, 'doctor'):
+        role = 'doctor'
+    elif hasattr(user, 'patient'):
+        role = 'patient'
+    elif user.is_superuser:
+        role = 'admin'
+    elif hasattr(user, 'profile'):
+        role = user.profile.role
+    else:
+        role = 'admin' if user.is_staff else 'patient'
+
     role_data = {}
 
     if hasattr(user, 'doctor'):
         role = 'doctor'
         doc = user.doctor
         role_data = {
+            'doctor_id': doc.id,
             'department': doc.department, 
             'status': doc.status,
             'phone': doc.mobile,
@@ -227,13 +290,14 @@ def me(request):
     elif hasattr(user, 'patient') and role == 'patient':
         pat = user.patient
         role_data = {
+            'patient_id': pat.id,
             'symptoms': pat.symptoms, 
             'risk_level': pat.risk_level,
             'phone': pat.mobile,
             'address': pat.address
         }
         
-    # Check Profile again if it's receptionist/nurse/pharmacist/supervisor
+    # Check Profile again if it's receptionist/pharmacist
     if hasattr(user, 'profile') and role not in ['admin', 'doctor', 'patient']:
         role = user.profile.role
         role_data['phone'] = getattr(user.profile, 'phone', getattr(user.profile, 'mobile', ''))
@@ -338,7 +402,21 @@ class PatientViewSet(viewsets.ModelViewSet):
         return super().get_serializer_class()
 
     def get_queryset(self):
+        user = self.request.user
         qs = self.queryset.filter(is_deleted=False)
+
+        # HIPAA Privacy: Doctors see only their patients. Patients see ONLY themselves.
+        role = getattr(user, 'profile', None) and user.profile.role or 'patient'
+        
+        if user.is_superuser or role == 'admin':
+            pass # Super Admins see all
+        elif hasattr(user, 'doctor'):
+            qs = qs.filter(assigned_doctor=user.doctor)
+        elif hasattr(user, 'patient'):
+            qs = qs.filter(user=user)
+        else:
+            # All other users (including non-clinical staff) see nothing in patient registry by default
+            qs = qs.none() 
 
         status_filter = self.request.query_params.get('status')
         risk = self.request.query_params.get('risk_level')
@@ -403,24 +481,61 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     queryset = Appointment.objects.select_related('patient__user', 'doctor__user').all()
     serializer_class = AppointmentSerializer
     permission_classes = [permissions.IsAuthenticated, RBACPermission]
+    
+    def perform_create(self, serializer):
+        user = self.request.user
+        role = 'doctor' if hasattr(user, 'doctor') else ('patient' if hasattr(user, 'patient') else (getattr(user, 'profile', None) and user.profile.role) or ('admin' if user.is_staff else 'patient'))
+        
+        # Clinical Identity Locking: Physicians and Patients cannot masquerade as others.
+        if hasattr(user, 'doctor') and role == 'doctor':
+            # Strict Caseload Verification: Doctor can only schedule for their own patients.
+            patient_id = self.request.data.get('patient')
+            if patient_id:
+                from hospital.models import Patient
+                if not Patient.objects.filter(id=patient_id, assigned_doctor=user.doctor).exists():
+                    from rest_framework.exceptions import ValidationError
+                    raise ValidationError("You cannot schedule for a patient outside your assigned caseload.")
+            serializer.save(doctor=user.doctor)
+        elif hasattr(user, 'patient') and role == 'patient':
+            serializer.save(patient=user.patient)
+        else:
+            serializer.save()
 
     def get_queryset(self):
+        user = self.request.user
         qs = self.queryset
-        if not self.request.user.is_staff:
+        role = 'doctor' if hasattr(user, 'doctor') else ('patient' if hasattr(user, 'patient') else (getattr(user, 'profile', None) and user.profile.role) or ('admin' if user.is_staff else 'patient'))
+        
+        # HIPAA Caseload Alignment: Physicians only see their OWN schedules and assigned clinical base.
+        if hasattr(user, 'doctor') and role == 'doctor':
+            qs = qs.filter(doctor=user.doctor, patient__assigned_doctor=user.doctor)
+        elif hasattr(user, 'patient') and role == 'patient':
+            qs = qs.filter(patient=user.patient)
+        elif user.is_superuser or role == 'admin':
+            pass
+        else:
+            qs = qs.none()
+
+        if not user.is_staff and not hasattr(user, 'doctor'):
             qs = qs.filter(patient__is_deleted=False, doctor__is_deleted=False)
             
         doctor_id = self.request.query_params.get('doctor_id')
         patient_id = self.request.query_params.get('patient_id')
         appt_status = self.request.query_params.get('status')
         date = self.request.query_params.get('date')
-        if doctor_id:
-            qs = qs.filter(Q(doctorId=doctor_id) | Q(doctor_id=doctor_id))
-        if patient_id:
-            qs = qs.filter(Q(patientId=patient_id) | Q(patient_id=patient_id))
+        # Identification Overrides: Restricted to System Administrators.
+        role = getattr(user, 'profile', None) and user.profile.role or 'patient'
+        if user.is_superuser or role == 'admin':
+            if doctor_id:
+                qs = qs.filter(Q(doctorId=doctor_id) | Q(doctor_id=doctor_id))
+            if patient_id:
+                qs = qs.filter(Q(patientId=patient_id) | Q(patient_id=patient_id))
+        
         if appt_status:
             qs = qs.filter(status=appt_status)
         if date:
             qs = qs.filter(appointment_date=date)
+            
         return qs.order_by('-appointment_date')
 
     @action(detail=True, methods=['post'])
@@ -467,193 +582,36 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
 
 class MedicalRecordViewSet(viewsets.ModelViewSet):
-    queryset = MedicalRecord.objects.select_related('patient', 'doctor').all()
+    queryset = MedicalRecord.objects.select_related('patient__user', 'doctor__user').all()
     serializer_class = MedicalRecordSerializer
     permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get_queryset(self):
+        user = self.request.user
         qs = self.queryset
+        
+        # Clinical Record Isolation: Bound to session doctor and assigned caseload.
+        if hasattr(user, 'doctor') and not user.is_superuser:
+            qs = qs.filter(doctor=user.doctor, patient__assigned_doctor=user.doctor)
+        elif hasattr(user, 'patient') and not user.is_superuser:
+            qs = qs.filter(patient=user.patient)
+        elif user.is_superuser or (hasattr(user, 'profile') and user.profile.role == 'admin'):
+            pass
+        elif not user.is_staff:
+            qs = qs.none()
+            
         patient_id = self.request.query_params.get('patient_id')
         if patient_id:
             qs = qs.filter(patient_id=patient_id)
         return qs
 
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def ai_chat(request):
-    """
-    Neural AI Agent: Processes natural language clinical commands.
-    Supported: 
-    1. Rescheduling: "Reschedule [Patient] to [YYYY-MM-DD] at [HH:MM]"
-    2. Risk Assessment: "Analyze high risk patients"
-    3. Staff Query: "Available cardiologist"
-    """
-    message = request.data.get('message', '').lower()
-    user = request.user
-    
-    # ─── 1. RESCHEDULING LOGIC ───
-    # Pattern: "reschedule [Any Name] to [YYYY-MM-DD] at [HH:MM]"
-    reschedule_match = re.search(r'reschedule\s+(.*?)\s+to\s+(\d{4}-\d{2}-\d{2})\s+at\s+(\d{2}:\d{2})', message)
-    if reschedule_match:
-        patient_name = reschedule_match.group(1).strip()
-        new_date = reschedule_match.group(2)
-        new_time = reschedule_match.group(3)
-        
-        # Try to find the patient and their most recent pending/confirmed appointment
-        appointments = Appointment.objects.filter(
-            Q(patientName__icontains=patient_name) | Q(patient__user__first_name__icontains=patient_name),
-            status__in=['pending', 'confirmed']
-        ).order_by('-appointment_date')
-        
-        if appointments.exists():
-            appt = appointments.first()
-            old_date = appt.appointment_date
-            appt.appointment_date = new_date
-            appt.appointment_time = new_time
-            appt.status = 'rescheduled'
-            appt.save()
-            
-            # Create a system notification for the patient/doctor if needed
-            Notification.objects.create(
-                user=appt.patient.user if appt.patient else user,
-                title="Appointment Rescheduled by AI",
-                message=f"Your appointment originally on {old_date} has been moved to {new_date} at {new_time} by the Neural Core.",
-                notification_type='appointment'
-            )
-            
-            return Response({
-                'role': 'ai',
-                'text': f"✅ Clinical Protocol Executed. Appointment for {patient_name} successfully moved to {new_date} at {new_time}. Database synchronized.",
-                'action_taken': 'reschedule'
-            })
+    def perform_create(self, serializer):
+        user = self.request.user
+        if hasattr(user, 'doctor'):
+            serializer.save(doctor=user.doctor, updated_by=user)
         else:
-            return Response({
-                'role': 'ai',
-                'text': f"⚠️ Unable to locate an active appointment for '{patient_name}'. Please verify the patient name or ID.",
-            })
+            serializer.save(updated_by=user)
 
-    # ─── 2. RISK ASSESSMENT ───
-    if 'risk' in message or 'critical' in message:
-        high_risk_count = Patient.objects.filter(risk_level__in=['high', 'critical']).count()
-        patients = Patient.objects.filter(risk_level__in=['high', 'critical'])[:3]
-        names = ", ".join([p.get_name for p in patients])
-        return Response({
-            'role': 'ai',
-            'text': f"📊 Intelligence Report: There are {high_risk_count} patients in high/critical risk zones. Key focus: {names}. Shall I notify the head of department?",
-        })
-
-    # ─── 3. STAFF QUERY ───
-    if 'cardiologist' in message or 'specialist' in message:
-        docs = Doctor.objects.filter(status=True, department='Cardiologist')
-        if docs.exists():
-            doc_list = ", ".join([f"Dr. {d.user.last_name}" for d in docs])
-            return Response({
-                'role': 'ai',
-                'text': f"🩺 Specialized Personnel Available: {doc_list} are currently online in the Cardiologist department.",
-            })
-
-    # ─── 4. SYMPTOM ANALYSIS (Legacy mapping update) ───
-    SYMPTOM_MAP = {
-        r'fever|headache': "Neural analysis suggests potential viral pathology. Recommend CBC and hydration protocol. Shall I book a diagnostic test?",
-        r'chest pain|heart': "🚨 CRITICAL ALERT: Symptoms suggestive of cardiac distress. Emergency protocol initiated. Direct patient to triage immediately.",
-        r'diabetes|sugar': "HbA1c optimization required. Suggest endocrinology consult and glucose monitoring chart update.",
-    }
-    
-    for pattern, response in SYMPTOM_MAP.items():
-        if re.search(pattern, message):
-            return Response({'role': 'ai', 'text': response})
-
-    return Response({
-        'role': 'ai',
-        'text': "I am the Lifeline AI Neural Core. I can reschedule appointments, analyze patient risks, or query hospital resources. How may I assist your clinical workflow today?",
-    })
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def proxy_gemini(request):
-    """Secure proxy for Google Gemini API to bypass K7 and local network Web Proxies that inject client certificates."""
-    key = request.data.get('key')
-    payload = request.data.get('payload')
-    
-    if not key or not payload:
-        return Response({'error': 'Missing key or payload'}, status=status.HTTP_400_BAD_REQUEST)
-        
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key}"
-    try:
-        import urllib3 # type: ignore
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        
-        # verify=False intentionally bypasses K7 Proxy SSL certificate man-in-the-middle interceptions.
-        response = requests.post(url, json=payload, headers={'Content-Type': 'application/json'}, verify=False)
-        return Response(response.json(), status=response.status_code)
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-class AIDiagnosisViewSet(viewsets.ModelViewSet):
-    queryset = AIDiagnosis.objects.all()
-    serializer_class = AIDiagnosisSerializer
-    permission_classes = [permissions.IsAuthenticated, RBACPermission]
-
-    @action(detail=False, methods=['post'])
-    def analyze(self, request):
-        """Simple AI symptom analysis endpoint."""
-        symptoms = request.data.get('symptoms', '').lower()
-
-        SYMPTOM_MAP = {
-            r'fever|temperature|chills': {
-                'conditions': ['Viral Fever', 'Dengue Fever', 'Typhoid', 'Malaria'],
-                'severity': 'moderate', 'tests': ['CBC', 'NS1 Antigen', 'Widal Test'],
-                'advice': 'Monitor temperature every 4 hours. Stay hydrated. Seek care if fever exceeds 103°F or lasts 48+ hours.',
-            },
-            r'chest pain|heart|angina': {
-                'conditions': ['Angina Pectoris', 'Myocardial Infarction', 'GERD', 'Pneumonia'],
-                'severity': 'high', 'tests': ['ECG', 'Troponin', 'Chest X-Ray'],
-                'advice': 'URGENT: Please seek emergency care immediately. Do not delay.',
-            },
-            r'headache|migraine': {
-                'conditions': ['Tension Headache', 'Migraine', 'Hypertension'],
-                'severity': 'low', 'tests': ['BP Check', 'CT Scan if severe'],
-                'advice': 'Rest in a dark, quiet room. Apply cold compress. Stay hydrated.',
-            },
-            r'cough|cold|flu': {
-                'conditions': ['Common Cold', 'Influenza', 'Bronchitis', 'Asthma'],
-                'severity': 'low', 'tests': ['Chest X-Ray', 'COVID-19 Test'],
-                'advice': 'Stay hydrated. Avoid irritants. Consult if cough persists beyond 3 weeks.',
-            },
-            r'diabetes|sugar|glucose': {
-                'conditions': ['Type 2 Diabetes', 'Pre-Diabetes'],
-                'severity': 'moderate', 'tests': ['FBS', 'HbA1c', 'PPBS'],
-                'advice': 'Regular blood glucose monitoring essential. Dietary control and exercise are key.',
-            },
-        }
-
-        matched = {}
-        for pattern, data in SYMPTOM_MAP.items():
-            if re.search(pattern, symptoms):
-                matched = data
-                break
-
-        if not matched:
-            matched = {
-                'conditions': ['Unclassified — specialist evaluation required'],
-                'severity': 'low', 'tests': ['General Health Check-up'],
-                'advice': 'Please consult our specialists for a detailed evaluation.',
-            }
-
-        create_kwargs = {
-            'input_symptoms': request.data.get('symptoms', ''),
-            'suggested_conditions': matched['conditions'],
-            'severity': matched['severity'],
-            'suggested_tests': matched['tests'],
-            'advice': matched['advice'],
-            'confidence_score': 0.87 if matched['conditions'][0] != 'Unclassified — specialist evaluation required' else 0.40,
-            'patient_id': request.data.get('patient_id'),
-        }
-        diagnosis = AIDiagnosis.objects.create(**create_kwargs)  # type: ignore
-
-        return Response(AIDiagnosisSerializer(diagnosis).data, status=status.HTTP_201_CREATED)
 
 
 class BillViewSet(viewsets.ModelViewSet):
@@ -662,17 +620,26 @@ class BillViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get_queryset(self):
+        user = self.request.user
+        # Financial Record Isolation: Bound to session identity
+        role = getattr(user, 'profile', None) and user.profile.role or 'patient'
+        
         qs = self.queryset
-        if not self.request.user.is_staff:
+        if user.is_superuser or role in ['admin', 'pharmacist', 'receptionist']:
+            pass # Financial controllers see all ledgers
+        elif hasattr(user, 'patient'):
+            qs = qs.filter(patient=user.patient)
+        elif hasattr(user, 'doctor'):
+            qs = qs.filter(patient__assigned_doctor=user.doctor)
+            
+        if not user.is_staff and not hasattr(user, 'doctor') and role not in ['pharmacist', 'receptionist']:
             qs = qs.filter(patient__is_deleted=False)
             
         bill_status = self.request.query_params.get('status')
         patient_id = self.request.query_params.get('patient_id')
         if bill_status:
             qs = qs.filter(status=bill_status)
-        if patient_id:
-            qs = qs.filter(patient_id=patient_id)
-        return qs.order_by('-bill_date')[:200]  # Most recent 200 bills
+        return qs.order_by('-bill_date')
 
     @action(detail=True, methods=['post'])
     def mark_paid(self, request, pk=None):
@@ -685,9 +652,25 @@ class BillViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def generate_pdf(self, request, pk=None):
-        """Generate a professional PDF invoice for the bill."""
+        """Generate a professional PDF invoice for the bill with Zero-Fail reliability."""
+        import io
+        import uuid
+        from django.http import HttpResponse # type: ignore
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle # type: ignore
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle # type: ignore
+        from reportlab.lib import colors # type: ignore
+        from reportlab.lib.pagesizes import A4 # type: ignore
+        
         bill = self.get_object()
-        patient_name = bill.patient.get_name
+        
+        # Zero-Fail Name Logic
+        p_name = "UNREGISTERED GUEST"
+        if bill.patient:
+            p_name = str(bill.patient.get_name)
+        elif bill.guest_name:
+            p_name = str(bill.guest_name)
+
+        patient_id_str = f"PID-{bill.patient.id:04d}" if bill.patient else f"G-MOBILE: {bill.guest_mobile or 'N/A'}"
 
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=50, bottomMargin=50)
@@ -704,19 +687,18 @@ class BillViewSet(viewsets.ModelViewSet):
             spaceAfter=20, fontName='Helvetica-Bold'
         )
         norm_style = ParagraphStyle('LUNANorm', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#061e3a'))
-        bold_style = ParagraphStyle('LUNABold', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=colors.HexColor('#061e3a'))
 
         # Header Section
         elements.append(Paragraph("Lifeline Hospital", title_style))
-        elements.append(Paragraph("NEXT-GEN CLINICAL BILLING", subtitle_style))
+        elements.append(Paragraph("INSTITUTIONAL BILLING TERMINAL", subtitle_style))
         elements.append(Paragraph("Lifeline Medical Tower, Koramangala<br/>Bangalore — 560034<br/>Phone: +91 80 4567 8900", norm_style))
         elements.append(Spacer(1, 20))
 
         # Invoice Info vs Patient Info
         info_data = [
             [
-                Paragraph(f"<b>Billed To:</b><br/>{patient_name}<br/>ID: PID-{bill.patient.id:04d}", norm_style),
-                Paragraph(f"<b>Invoice #:</b> {bill.invoice_number}<br/><b>Date:</b> {bill.bill_date}<br/><b>Status:</b> {bill.status.upper()}", norm_style)
+                Paragraph(f"<b>Billed To:</b><br/>{p_name}<br/>ID: {patient_id_str}", norm_style),
+                Paragraph(f"<b>Invoice #:</b> {str(bill.invoice_number)}<br/><b>Date:</b> {str(bill.bill_date)}<br/><b>Status:</b> {str(bill.status).upper()}", norm_style)
             ]
         ]
         info_table = Table(info_data, colWidths=[250, 250])
@@ -730,22 +712,22 @@ class BillViewSet(viewsets.ModelViewSet):
         # Line Items Table
         data = [
             ['Description', 'Amount (₹)'],
-            ['Consultation Fee', f"{bill.consultation_fee:,.2f}"],
-            ['Medicine Cost', f"{bill.medicine_cost:,.2f}"],
-            ['Test & Diagnostic Cost', f"{bill.test_cost:,.2f}"],
-            ['Room / Facility Charge', f"{bill.room_charge:,.2f}"],
-            ['Other Charges', f"{bill.other_charges:,.2f}"]
+            ['Consultation Fee', f"{float(bill.consultation_fee or 0):,.2f}"],
+            ['Medicine Cost', f"{float(bill.medicine_cost or 0):,.2f}"],
+            ['Test & Diagnostic Cost', f"{float(bill.test_cost or 0):,.2f}"],
+            ['Room / Facility Charge', f"{float(bill.room_charge or 0):,.2f}"],
+            ['Other Charges', f"{float(bill.other_charges or 0):,.2f}"]
         ]
 
-        subtotal = float(bill.consultation_fee + bill.medicine_cost + bill.test_cost + bill.room_charge + bill.other_charges)
-        discount_amt = subtotal * (float(bill.discount) / 100)
-        tax_amt = (subtotal - discount_amt) * (float(bill.tax_rate) / 100)
+        subtotal = float(bill.consultation_fee or 0) + float(bill.medicine_cost or 0) + float(bill.test_cost or 0) + float(bill.room_charge or 0) + float(bill.other_charges or 0)
+        discount_amt = subtotal * (float(bill.discount or 0) / 100)
+        tax_amt = (subtotal - discount_amt) * (float(bill.tax_rate or 18) / 100)
 
         data.append(['', '']) # empty spacer
         data.append(['Subtotal', f"{subtotal:,.2f}"])
         data.append([f"Discount ({bill.discount}%)", f"-{discount_amt:,.2f}"])
         data.append([f"Tax ({bill.tax_rate}%)", f"+{tax_amt:,.2f}"])
-        data.append(['TOTAL AMOUNT', f"{bill.total_amount:,.2f}"])
+        data.append(['TOTAL AMOUNT', f"{float(bill.total_amount or 0):,.2f}"])
 
         table = Table(data, colWidths=[350, 150])
         table.setStyle(TableStyle([
@@ -774,13 +756,14 @@ class BillViewSet(viewsets.ModelViewSet):
         elements.append(Paragraph("Thank you for choosing Lifeline Hospital. For billing inquiries, contact billing@lifeline.health", norm_style))
         if bill.status == 'paid':
             elements.append(Spacer(1, 10))
-            elements.append(Paragraph(f"<b>Payment Method:</b> {bill.payment_method.capitalize()}<br/><b>Paid On:</b> {bill.paid_date}", norm_style))
+            elements.append(Paragraph(f"<b>Payment Method:</b> {str(bill.payment_method or '').capitalize()}<br/><b>Paid On:</b> {str(bill.paid_date or '')}", norm_style))
 
         doc.build(elements)
-        buffer.seek(0)
+        pdf = buffer.getvalue()
+        buffer.close()
         
-        response = HttpResponse(buffer, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Invoice_{bill.invoice_number}.pdf"'
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="Invoice_{str(bill.invoice_number or uuid.uuid4().hex[:6])}.pdf"'
         return response
 
 
@@ -849,68 +832,166 @@ class PharmacyItemViewSet(viewsets.ModelViewSet):
 
 
 
-class TelemedSessionViewSet(viewsets.ModelViewSet):
-    queryset = TelemedSession.objects.select_related('doctor', 'patient').all()
-    serializer_class = TelemedSessionSerializer
+class TeleConsultationViewSet(viewsets.ModelViewSet):
+    queryset = TeleConsultationSession.objects.select_related('created_by__user', 'patient__user', 'appointment').all()
+    serializer_class = TeleConsultationSessionSerializer
     permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get_queryset(self):
+        user = self.request.user
         qs = self.queryset
-        if not self.request.user.is_staff:
-            qs = qs.filter(patient__is_deleted=False, doctor__is_deleted=False)
-            
-        doctor_id = self.request.query_params.get('doctor_id')
-        patient_id = self.request.query_params.get('patient_id')
-        status_filter = self.request.query_params.get('status')
+        if user.is_staff: return qs
+        return qs.filter(Q(created_by__user=user) | Q(patient__user=user) | Q(participants__user=user)).distinct()
 
-        if doctor_id:
-            qs = qs.filter(doctor_id=doctor_id)
-        if patient_id:
-            qs = qs.filter(patient_id=patient_id)
-        if status_filter:
-            qs = qs.filter(status=status_filter)
-        return qs
+    @action(detail=False, methods=['post'], url_path='create')
+    def create_meeting(self, request):
+        """Strict Provisioning: Only verified physicians can initiate a secure clinical bridge."""
+        if not hasattr(request.user, 'doctor'):
+            return Response({'error': 'Clinical Authority Required: Only physicians can initiate consultation bridges.'}, status=status.HTTP_403_FORBIDDEN)
+            
+        appointment_id = request.data.get('appointment')
+        patient_id = request.data.get('patient')
+        
+        if not appointment_id or not patient_id:
+            return Response({'error': 'Clinical identifiers (appointment/patient) are required.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            appointment = Appointment.objects.get(id=appointment_id)
+            patient = Patient.objects.get(id=patient_id)
+            
+            # Deactivate any existing live bridges for this appointment to maintain 1:1 parity
+            TeleConsultationSession.objects.filter(appointment=appointment, status='live').update(status='cancelled')
+            
+            token = uuid.uuid4()
+            # If a custom link is provided (e.g. from the Telemedicine UI), use it.
+            # Otherwise, provision a secure institutional bridge.
+            link = request.data.get('meeting_link')
+            if not link:
+                room_name = f"luna-{token.hex[:3]}-{token.hex[3:7]}-{token.hex[7:10]}"
+                link = f"https://meet.google.com/{room_name}"
+            
+            session = TeleConsultationSession.objects.create(
+                appointment=appointment,
+                patient=patient,
+                created_by=request.user.doctor,
+                token=token,
+                meeting_link=link,
+                status='live'
+            )
+            
+            # Automated IMMUTABLE Participant Enrollment
+            MeetingParticipant.objects.create(session=session, user=request.user, role='doctor')
+            MeetingParticipant.objects.create(session=session, user=patient.user, role='patient')
+            
+            return Response(TeleConsultationSessionSerializer(session).data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': f'Bridge initialization failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'], url_path='join/(?P<token>[^/.]+)')
+    def join_by_token(self, request, token=None):
+        """Zero-Trust Join Logic: Token check + Enrolled Participant validation."""
+        try:
+            session = TeleConsultationSession.objects.get(token=token, status='live')
+            
+            # Strict Enrollment Check
+            is_enrolled = MeetingParticipant.objects.filter(session=session, user=request.user).exists()
+            if not is_enrolled and not request.user.is_staff:
+                return Response({'error': 'UNAUTHORIZED: You are not an enrolled participant for this clinical session.'}, status=status.HTTP_403_FORBIDDEN)
+                
+            return Response({
+                'id': session.id,
+                'token': session.token,
+                'status': session.status,
+                'meeting_link': session.meeting_link,
+                'patient_name': session.patient.get_name,
+                'doctor_name': session.created_by.get_name
+            })
+        except TeleConsultationSession.DoesNotExist:
+            return Response({'error': 'Clinical session not found, expired, or terminated.'}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['post'], url_path='invite')
+    def invite_specialist(self, request):
+        """Clinical Collaboration: Attending physician invites specialists to the active bridge."""
+        session_id = request.data.get('session_id')
+        doctor_id = request.data.get('doctor_id')
+        
+        if not session_id or not doctor_id:
+            return Response({'error': 'Session and Specialist identifiers required.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            session = TeleConsultationSession.objects.get(id=session_id)
+            if session.created_by.user != request.user:
+                return Response({'error': 'AUTHORITY DENIED: Only the attending physician can invite specialists.'}, status=status.HTTP_403_FORBIDDEN)
+                
+            invitee = Doctor.objects.get(id=doctor_id)
+            MeetingParticipant.objects.get_or_create(session=session, user=invitee.user, defaults={'role': 'doctor'})
+            
+            # Direct System Notification
+            from hospital.models import Notification
+            Notification.objects.create(
+                user=invitee.user,
+                title="Specialist Invitation Request",
+                message=f"Dr. {request.user.get_full_name()} has requested your specialized assistance for Patient {session.patient.get_name}.",
+                notification_type='appointment'
+            )
+            return Response({'message': 'Specialist invitation dispatched and access granted.'})
+        except Exception as e:
+            return Response({'error': f'Enrollment failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'])
+    def participants(self, request, pk=None):
+        session = self.get_object()
+        return Response(MeetingParticipantSerializer(session.participants.all(), many=True).data)
 
     def perform_update(self, serializer):
         instance = serializer.save()
         if instance.status == 'completed':
             from hospital.models import Appointment
-            from django.utils import timezone
-            today = timezone.now().date()
-            Appointment.objects.filter(
-                doctor=instance.doctor,
-                patient=instance.patient,
-                appointment_date=today,
-                status__in=['pending', 'confirmed']
-            ).update(status='completed')
+            if instance.appointment:
+                instance.appointment.status = 'completed'
+                instance.appointment.save()
 
 
 class LabTestViewSet(viewsets.ModelViewSet):
-    queryset = LabTest.objects.select_related('patient').all()
+    queryset = LabTest.objects.select_related('patient__user').all()
     serializer_class = LabTestSerializer
     permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get_queryset(self):
         qs = self.queryset
-        if not self.request.user.is_staff:
-            qs = qs.filter(patient__is_deleted=False)
-            
+        user = self.request.user
+        
+        if hasattr(user, 'doctor') and not user.is_superuser:
+            qs = qs.filter(patient__assigned_doctor=user.doctor)
+        elif hasattr(user, 'patient') and not user.is_superuser:
+            qs = qs.filter(patient=user.patient)
+        elif user.is_superuser or (hasattr(user, 'profile') and user.profile.role == 'admin'):
+            pass
+        elif not user.is_staff:
+            qs = qs.none()
+
         patient_id = self.request.query_params.get('patient_id')
-        abnormal = self.request.query_params.get('abnormal')
-        if patient_id:
-            qs = qs.filter(patient_id=patient_id)
-        if abnormal:
-            qs = qs.filter(is_abnormal=(abnormal.lower() == 'true'))
         return qs
 
 
 class PrescriptionViewSet(viewsets.ModelViewSet):
-    queryset = Prescription.objects.select_related('doctor', 'patient').all()
+    queryset = Prescription.objects.select_related('doctor__user', 'patient__user').all()
     serializer_class = PrescriptionSerializer
     permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get_queryset(self):
         qs = self.queryset
+        user = self.request.user
+        
+        if hasattr(user, 'doctor') and not user.is_superuser:
+            qs = qs.filter(doctor=user.doctor, patient__assigned_doctor=user.doctor)
+        elif hasattr(user, 'patient') and not user.is_superuser:
+            qs = qs.filter(patient=user.patient)
+        elif user.is_superuser or (hasattr(user, 'profile') and user.profile.role in ['admin', 'pharmacist']):
+            pass
+        elif not user.is_staff:
+            qs = qs.none()
+
         patient_id = self.request.query_params.get('patient_id')
         date = self.request.query_params.get('date')
         if patient_id:
@@ -933,7 +1014,151 @@ class PharmacyOrderViewSet(viewsets.ModelViewSet):
     serializer_class = PharmacyOrderSerializer
     permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
-class CleaningTaskViewSet(viewsets.ModelViewSet):
-    queryset = CleaningTask.objects.all()
-    serializer_class = CleaningTaskSerializer
+    def get_queryset(self):
+        # Pharmacists see all orders, others see their own (if applicable)
+        user = self.request.user
+        if hasattr(user, 'profile') and user.profile.role == 'pharmacist':
+            return self.queryset
+        return self.queryset.filter(pharmacist=user)
+
+    @action(detail=False, methods=['post'])
+    def process_order(self, request):
+        """
+        Atomic Pharmacy Transaction Engine.
+        Processes either a Prescription Fulfillment or a Direct POS Sale.
+        """
+        data = request.data
+        mode = data.get('mode') # 'rx' or 'pos'
+        prescription_id = data.get('prescription_id')
+        patient_id = data.get('patient_id')
+        items = data.get('items', []) # List of {id, quantity}
+        payment_status = data.get('payment_status', 'pending')
+        
+        if not items:
+            return Response({'error': 'No clinical items provided for fulfillment.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from decimal import Decimal
+            with transaction.atomic():
+                total_medicine_cost = Decimal('0')
+                
+                # 1. Stock Validation & Deduction
+                for item in items:
+                    try:
+                        pharm_item = PharmacyItem.objects.select_for_update().get(id=item['id'])
+                    except PharmacyItem.DoesNotExist:
+                        return Response({'error': f"Clinical Asset ID {item['id']} not found in inventory."}, status=status.HTTP_404_NOT_FOUND)
+                    
+                    qty = int(item['quantity'])
+                    if pharm_item.stock_level < qty:
+                        return Response({'error': f"Insufficient stock for {pharm_item.name}. Available: {pharm_item.stock_level}"}, status=status.HTTP_400_BAD_REQUEST)
+                    
+                    pharm_item.stock_level -= qty
+                    pharm_item.save()
+                    total_medicine_cost += pharm_item.unit_price * Decimal(str(qty))
+
+                # 2. Prescription Logic
+                prescription = None
+                if mode == 'rx' and prescription_id:
+                    prescription = Prescription.objects.get(id=prescription_id)
+                    # Update or create PharmacyOrder
+                    order, created = PharmacyOrder.objects.update_or_create(
+                        prescription=prescription,
+                        defaults={'pharmacist': request.user, 'status': 'completed'}
+                    )
+                    patient_id = prescription.patient.id
+
+                # 3. Bill Generation
+                guest_name = data.get('guest_name')
+                guest_mobile = data.get('guest_mobile')
+                
+                if not patient_id and not guest_name:
+                    return Response({'error': 'Institutional patient session or Guest name required for transaction.'}, status=status.HTTP_400_BAD_REQUEST)
+                
+                patient = Patient.objects.filter(id=patient_id).first() if patient_id else None
+                prefix = 'PHRM' if mode == 'rx' else 'POS'
+                invoice_no = f"INV-{prefix}-{uuid.uuid4().hex[:6].upper()}"
+                
+                bill = Bill.objects.create(
+                    patient=patient,
+                    guest_name=guest_name if not patient else None,
+                    guest_mobile=guest_mobile if not patient else None,
+                    appointment=prescription.appointment if prescription else None,
+                    invoice_number=invoice_no,
+                    medicine_cost=total_medicine_cost,
+                    status=payment_status,
+                    payment_method='cash' if payment_status == 'paid' else ''
+                )
+
+                return Response({
+                    'message': 'Transaction processed successfully.',
+                    'invoice_number': invoice_no,
+                    'bill_id': bill.id,
+                    'total_amount': bill.total_amount,
+                    'mode': mode
+                }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({'error': f"Clinical Transaction Failure: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ─── STAFF GOVERNANCE ViewSet (Module 6) ─────────────────────
+class StaffViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.filter(profile__role__in=['admin', 'doctor', 'pharmacist', 'receptionist']).select_related('profile').all()
+    serializer_class = StaffUserSerializer
     permission_classes = [permissions.IsAuthenticated, RBACPermission]
+
+    def get_queryset(self):
+        # Operational Lockdown: Only superusers and designated admins can view the staff roster.
+        if not self.request.user.is_staff and not self.request.user.is_superuser:
+            return self.queryset.none()
+        return self.queryset.order_by('-date_joined')
+
+    @action(detail=False, methods=['post'])
+    def enroll(self, request):
+        """Enroll a new staff member with a specific clinical role."""
+        data = request.data
+        serializer = RegisterSerializer(data=data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        v_data = serializer.validated_data
+        
+        # Identity Construction
+        user = User.objects.create_user(
+            username=v_data['username'],
+            password=v_data['password'],
+            email=v_data['email'],
+            first_name=v_data['first_name'],
+            last_name=v_data['last_name']
+        )
+        
+        from hospital.models import UserProfile
+        UserProfile.objects.update_or_create(
+            user=user, 
+            defaults={
+                'role': v_data.get('role', 'admin'),
+                'phone': v_data.get('phone', '')
+            }
+        )
+        user.is_staff = True
+        user.is_active = True
+        user.save()
+
+        # Doctor Model Persistence (if applicable)
+        if user.profile.role == 'doctor':
+            from hospital.models import Doctor
+            Doctor.objects.create(
+                user=user,
+                mobile=v_data.get('phone', ''),
+                address=v_data.get('address', 'Institutional Facility'),
+                department=v_data.get('department', 'Cardiologist'),
+                status=True
+            )
+
+        return Response({'message': f'Institutional account created for {user.username} as {user.profile.role}.'}, status=status.HTTP_201_CREATED)
+
+    def perform_destroy(self, instance):
+        """Archive staff member for clinical accountability."""
+        instance.is_active = False
+        instance.save()

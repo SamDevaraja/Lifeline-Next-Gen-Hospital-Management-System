@@ -5,7 +5,7 @@ import {
     ChevronRight, Search, Plus, HeartPulse, Sparkles, TrendingUp,
     FileText, Bell, DollarSign, Stethoscope, BrainCircuit,
     BarChart3, AlertCircle, CheckCircle, Clock, X, Menu,
-    Video, Pill, FlaskConical, Smartphone, QrCode, User, Mic, ArrowRight, Sun, Moon, Globe, ChevronDown, Filter,
+    Video, Pill, FlaskConical, Smartphone, QrCode, User, Mic, ArrowRight, Sun, Moon, Globe, ChevronDown, Filter, UploadCloud,
     Mail, Lock
 } from 'lucide-react';
 import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
@@ -105,6 +105,34 @@ const InputModal = ({ isOpen, title, fields, onConfirm, onCancel }) => {
                                                 <option key={opt.value} value={opt.value} className="font-bold">{opt.label}</option>
                                             ))}
                                         </select>
+                                    ) : f.type === 'file' ? (
+                                        <div className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all group ${f.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-500/5 cursor-pointer'}`} style={{ borderColor: 'var(--luna-border)' }}>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={e => {
+                                                    const file = e.target.files[0];
+                                                    if (file) {
+                                                        const reader = new FileReader();
+                                                        reader.onloadend = () => setValues(prev => ({ ...prev, [f.key]: reader.result }));
+                                                        reader.readAsDataURL(file);
+                                                    }
+                                                }}
+                                                disabled={f.disabled}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
+                                            />
+                                            <div className="flex flex-col items-center gap-3">
+                                                <div className="w-12 h-12 rounded-2xl bg-[#7c3aed]/10 flex items-center justify-center text-[#7c3aed] group-hover:scale-110 transition-transform shadow-inner border border-[#7c3aed]/20">
+                                                    {values[f.key] ? <CheckCircle className="w-5 h-5 text-green-500" /> : <UploadCloud className="w-5 h-5" />}
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-black uppercase tracking-[0.15em] transition-colors group-hover:text-[#7c3aed]" style={{ color: values[f.key] ? '#10b981' : 'var(--luna-text-main)' }}>
+                                                        {values[f.key] ? "Scan Attached Successfully" : "Click or Form Drop Scan"}
+                                                    </p>
+                                                    <p className="text-[9px] font-bold opacity-40 mt-1 uppercase tracking-widest" style={{ color: 'var(--luna-text-main)' }}>Standard Image Encoding (JPEG, PNG)</p>
+                                                </div>
+                                            </div>
+                                        </div>
                                     ) : (
                                         <input
                                             type={f.type || 'text'}
@@ -181,13 +209,26 @@ const DetailsModal = ({ isOpen, title, data, onCancel }) => {
                                 if (typeof value === 'object' && value !== null) return null;
                                 if (['id', 'user', 'profile_pic', 'status', 'is_deleted'].includes(key)) return null;
 
+                                if (key === 'image_data' && value && typeof value === 'string' && value.startsWith('data:image')) {
+                                    return (
+                                        <div key={key} className="flex flex-col sm:flex-row gap-2 sm:gap-8 px-8 py-5 hover:bg-slate-500/5 transition-all duration-300" style={{ borderBottom: '1px solid var(--luna-border)' }}>
+                                            <div className="sm:w-1/3 flex-shrink-0 pt-1">
+                                                <span className="text-[10px] font-black uppercase tracking-[0.15em] opacity-50" style={{ color: 'var(--luna-text-muted)' }}>Scan / Image</span>
+                                            </div>
+                                            <div className="flex-grow">
+                                                <img src={value} alt="Medical Scan" className="max-w-full rounded-xl border opacity-90 shadow-sm" style={{ borderColor: 'var(--luna-border)' }} />
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
                                 return (
                                     <div key={key} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-8 px-8 py-5 hover:bg-slate-500/5 transition-all duration-300" style={{ borderBottom: '1px solid var(--luna-border)' }}>
                                         <div className="sm:w-1/3 flex-shrink-0">
                                             <span className="text-[10px] font-black uppercase tracking-[0.15em] opacity-50" style={{ color: 'var(--luna-text-muted)' }}>{formatLabel(key)}</span>
                                         </div>
                                         <div className="flex-grow">
-                                            <p className="text-sm font-bold leading-relaxed tracking-tight" style={{ color: 'var(--luna-text-main)' }}>
+                                            <p className="text-sm font-bold leading-relaxed tracking-tight break-all" style={{ color: 'var(--luna-text-main)' }}>
                                                 {formatValue(key, value)}
                                             </p>
                                         </div>

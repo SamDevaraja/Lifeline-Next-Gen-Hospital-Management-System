@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import { useTranslation } from 'react-i18next';
 import Footer from '../components/Footer';
+import logo from '/lifeline_themed_v1.svg?v=cachebust123';
 
 const LUNA = {
     sky: '#38bdf8',
@@ -112,26 +113,26 @@ const Home = () => {
                         {/* Left */}
                         <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, ease: "easeOut" }}>
                             <div className="section-tag mb-8 inline-flex px-4 py-2" style={{ background: 'var(--luna-navy)', color: 'var(--luna-blue)', borderColor: 'var(--luna-border)' }}>
-                                <Sparkles className="w-4 h-4" /> Internal Staff Intranet v2.1
+                                <Sparkles className="w-4 h-4" /> Professional Clinical OS v2.1
                             </div>
 
                             <h1 className="text-3xl md:text-5xl font-black mb-6 leading-[1.15] tracking-tight" style={{ color: 'var(--luna-text-main)' }}>
                                 Lifeline Network <br />
-                                <span className="text-gradient drop-shadow-lg">Clinical Operations Command</span>
+                                <span className="text-gradient drop-shadow-lg">Unified Clinical Workspace</span>
                             </h1>
 
                             <div className="w-24 h-1.5 rounded-full mb-10" style={{ background: `linear-gradient(90deg, ${LUNA.teal}, transparent)` }} />
 
                             <p className="text-lg mb-10 leading-relaxed max-w-xl font-bold" style={{ color: 'var(--luna-text-main)', opacity: 0.9 }}>
-                                Centralized, secure access gateway for authorized medical practitioners, nursing staff, and facility administrators.
+                                A secure, AI-powered bridge between healthcare professionals and patient care.
                             </p>
 
                             <div className="flex flex-wrap items-center gap-5 mb-20">
                                 <Link to="/login" id="hero-launch-btn" className="btn-teal px-10 py-4 text-base">
-                                    Authenticate Session <Lock className="w-5 h-5 ml-2" />
+                                    Access Portal <Lock className="w-5 h-5 ml-2" />
                                 </Link>
-                                <Link to="/signup" id="hero-register-btn" className="btn-white px-10 py-4 text-base">
-                                    Request Access Clearance
+                                <Link to="/patient/signup" id="hero-register-btn" className="btn-white px-10 py-4 text-base">
+                                    Register as Patient <ArrowRight className="w-5 h-5 ml-2" />
                                 </Link>
                             </div>
 
@@ -350,7 +351,7 @@ const CTASection = ({ t }) => (
         <div className="absolute inset-0 opacity-[0.03]"
             style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, var(--luna-teal) 1px, transparent 0)', backgroundSize: '32px 32px' }} />
         <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
-            <HeartPulse className="w-14 h-14 mx-auto mb-6 animate-pulse" style={{ color: LUNA.teal }} />
+            <img src={logo} alt="Lifeline" className="w-16 h-16 mx-auto mb-6 animate-pulse" />
             <h2 className="text-3xl md:text-5xl font-extrabold mb-6 leading-tight" style={{ color: 'var(--luna-text-main)' }}>
                 Internal Security Perimeter
             </h2>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { HeartPulse, Phone, Mail, MapPin, Facebook, Twitter, Linkedin, Instagram } from 'lucide-react';
+import logo from '/lifeline_themed_v1.svg?v=cachebust123';
 
 const LUNA = {
     sky: 'var(--luna-teal)',
@@ -21,8 +22,8 @@ const Footer = () => {
                     {/* Brand */}
                     <div>
                         <div className="flex items-center gap-3 mb-5">
-                            <div className="p-2 rounded-xl" style={{ background: 'var(--luna-navy)' }}>
-                                <HeartPulse className="w-5 h-5" style={{ color: LUNA.sky }} />
+                            <div className="p-0.5 rounded-xl transition-all" style={{ background: 'rgba(56,189,248,0.03)' }}>
+                                <img src={logo} alt="Lifeline" className="w-9 h-9 object-contain" />
                             </div>
                             <div>
                                 <p className="font-extrabold text-lg" style={{ color: LUNA.sky }}>Lifeline</p>
@@ -55,7 +56,6 @@ const Footer = () => {
                                 { to: '/ai-assistant', label: 'AI Assistant' },
                                 { to: '/contact', label: 'Support' },
                                 { to: '/login', label: 'Sign In' },
-                                { to: '/signup', label: 'Register' },
                             ].map(link => (
                                 <li key={link.to}>
                                     <Link to={link.to}
@@ -97,7 +97,7 @@ const Footer = () => {
                                 <Phone className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: LUNA.teal }} />
                                 <div>
                                     <p className="text-xs font-bold text-red-500 uppercase">Emergency Hotline</p>
-                                    <p className="text-sm font-extrabold" style={{ color: 'var(--luna-teal)' }}>+91 98765 43210</p>
+                                    <p className="text-sm font-extrabold" style={{ color: 'var(--luna-teal)' }}>+91 7395954829</p>
                                     <p className="text-xs" style={{ color: 'var(--luna-text-dim)' }}>Available 24/7</p>
                                 </div>
                             </div>

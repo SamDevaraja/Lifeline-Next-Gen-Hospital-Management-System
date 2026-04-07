@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { HeartPulse, ShieldCheck, BrainCircuit, Globe, Award, Users, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Footer from '../components/Footer';
+import logo from '/lifeline_themed_v1.svg?v=cachebust123';
 
 const LUNA = {
     navy: 'var(--luna-teal)',
@@ -28,9 +29,9 @@ const About = () => (
             <div className="max-w-6xl mx-auto px-6 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-1 gap-12 text-center">
                     <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-                        <div className="section-tag mx-auto inline-flex mb-8 uppercase tracking-[0.3em] font-black"
+                        <div className="section-tag mx-auto inline-flex mb-8 uppercase tracking-[0.3em] font-black items-center gap-2"
                             style={{ background: 'var(--luna-navy)', color: 'var(--luna-blue)', borderColor: 'var(--luna-border)' }}>
-                            <HeartPulse className="w-4 h-4" /> Mission Protocol
+                            <img src={logo} alt="Lifeline" className="w-5 h-5 object-contain" /> Mission Protocol
                         </div>
                         <h1 className="text-5xl md:text-7xl font-black mb-8 leading-[1.05] tracking-tighter" style={{ color: 'var(--luna-text-main)' }}>
                             The Logic of <br />
