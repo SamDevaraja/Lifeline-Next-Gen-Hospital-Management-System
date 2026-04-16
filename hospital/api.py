@@ -1,5 +1,6 @@
 from rest_framework import viewsets, permissions, status
 from django.db import transaction
+from django.core.cache import cache
 import uuid
 from hospital.permissions import RBACPermission  # type: ignore
 from rest_framework.response import Response  # type: ignore
@@ -8,11 +9,12 @@ from rest_framework.decorators import action, api_view, permission_classes  # ty
 from rest_framework.permissions import AllowAny, IsAuthenticated  # type: ignore
 from django.contrib.auth.models import User  # type: ignore
 from django.utils import timezone  # type: ignore
-from django.db.models import Sum, Count, Q  # type: ignore
+from django.db.models import Sum, Count, Q, Avg  # type: ignore
 from hospital.models import (  # type: ignore
     Doctor, Patient, Appointment,
     MedicalRecord, Bill, Notification, PharmacyItem,
-    TeleConsultationSession, MeetingParticipant, LabTest, Prescription, PharmacyOrder, UserProfile
+    TeleConsultationSession, MeetingParticipant, LabTest, Prescription, PharmacyOrder, UserProfile,
+    SupportMessage
 )
 from hospital.serializers import (  # type: ignore
     UserSerializer, DoctorSerializer, DoctorCreateSerializer,
@@ -20,7 +22,7 @@ from hospital.serializers import (  # type: ignore
     MedicalRecordSerializer, BillSerializer,
     NotificationSerializer, RegisterSerializer, DashboardStatsSerializer, PharmacyItemSerializer,
     TeleConsultationSessionSerializer, MeetingParticipantSerializer, LabTestSerializer, PrescriptionSerializer,
-    PharmacyOrderSerializer, StaffUserSerializer
+    PharmacyOrderSerializer, StaffUserSerializer, SupportMessageSerializer
 )
 import re
 import json
@@ -34,6 +36,92 @@ from reportlab.lib import colors  # type: ignore
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle  # type: ignore
 from django.shortcuts import redirect # type: ignore
 from django.conf import settings # type: ignore
+
+# ─── Search Views ───────────────────────────────────────────────
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def patient_search(request):
+    """Unified search for patient portal."""
+    q = request.query_params.get('q', '').lower()
+    user = request.user
+    if not hasattr(user, 'patient'):
+        return Response([])
+    
+    pat = user.patient
+    results = []
+    
+    # Search Appointments
+    appts = Appointment.objects.filter(patient=pat, doctor__user__last_name__icontains=q)
+    for a in appts:
+        results.append({
+            'type': 'Appointment',
+            'title': f"Visit with Dr. {a.doctor.user.last_name}",
+            'icon': 'Calendar',
+            'path': '/patient/dashboard/appointments'
+        })
+        
+    # Search Records
+    records = MedicalRecord.objects.filter(patient=pat, diagnosis__icontains=q)
+    for r in records:
+        results.append({
+            'type': 'Health Record',
+            'title': f"Diagnosis: {r.diagnosis[:30]}",
+            'icon': 'FileText',
+            'path': '/patient/dashboard/records'
+        })
+        
+    return Response(results[:10])
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def staff_search(request):
+    """Unified search for staff terminal."""
+    q = request.query_params.get('q', '').lower()
+    search_type = request.query_params.get('type', 'all')
+    user = request.user
+    role = getattr(user, 'profile', None) and user.profile.role or 'receptionist'
+    
+    if not user.is_staff and not hasattr(user, 'doctor'):
+         return Response([])
+         
+    results = []
+    
+    # Search Patients
+    patients = Patient.objects.filter(Q(user__first_name__icontains=q) | Q(user__last_name__icontains=q) | Q(mobile__icontains=q))
+    for p in patients[:5]:
+        results.append({
+            'type': 'Patient',
+            'title': f"{p.user.first_name} {p.user.last_name}",
+            'icon': 'User',
+            'path': f"/dashboard/patients?q={p.mobile}"
+        })
+        
+    # Search Doctors
+    if role == 'admin' or hasattr(user, 'doctor'):
+        doctors = Doctor.objects.filter(Q(user__first_name__icontains=q) | Q(user__last_name__icontains=q) | Q(department__icontains=q))
+        for d in doctors[:5]:
+            results.append({
+                'type': 'Specialist',
+                'title': f"Dr. {d.user.last_name} ({d.department})",
+                'icon': 'Stethoscope',
+                'path': '/dashboard/doctors'
+            })
+            
+    # Search Meds if pharmacist
+    if search_type in ['all', 'pharmacy'] and role in ['admin', 'pharmacist']:
+        items = PharmacyItem.objects.filter(
+            Q(name__icontains=q) | 
+            Q(category__icontains=q)
+        )[:10]
+        for item in items:
+            results.append({
+                'title': item.name,
+                'type': f'Medicine ({item.category})',
+                'path': f'/dashboard/pharmacy',
+                'icon': 'Pill'
+            })
+            
+    return Response(results[:10])
 
 # ─── Auth Views ───────────────────────────────────────────────
 @api_view(['GET'])
@@ -139,8 +227,7 @@ def public_stats(request):
     return Response({
         'uptime': 99.98,
         'hospitals': Doctor.objects.filter(status=True, is_deleted=False).count(),
-        'patients_served': Patient.objects.filter(is_deleted=False).count(),
-        'ai_accuracy': 98.4
+        'patients_served': Patient.objects.filter(is_deleted=False).count()
     })
 
 
@@ -185,7 +272,6 @@ def dashboard_stats(request):
                 'today_appointments': Appointment.objects.filter(doctor=doc, appointment_date=today).count(),
                 'high_risk_patients': Patient.objects.filter(assigned_doctor=doc, risk_level__in=['high', 'critical'], is_deleted=False).count(),
                 'lab_tests_pending': LabTest.objects.filter(patient__assigned_doctor=doc).count(),
-                'ai_diagnoses_today': Patient.objects.filter(assigned_doctor=doc, risk_level__in=['high', 'critical'], is_deleted=False).count(),
             }
         elif role == 'patient':
             pat = user.patient
@@ -225,21 +311,36 @@ def me(request):
     
     if request.method == 'PATCH':
         data = request.data
-        # Update User model
+        
+        # ─── Clinical Alias Update (Username) ──────────────
+        new_username = data.get('username')
+        if new_username and new_username != user.username:
+            if User.objects.filter(username=new_username).exclude(id=user.id).exists():
+                return Response({'error': 'This username is already registered.'}, status=status.HTTP_400_BAD_REQUEST)
+            user.username = new_username
+
+        # ─── Secure Credential Modification (Password) ──────
+        new_password = data.get('new_password')
+        confirm_password = data.get('confirm_password')
+        if new_password:
+            if new_password != confirm_password:
+                return Response({'error': 'Passwords do not match.'}, status=status.HTTP_400_BAD_REQUEST)
+            if len(new_password) < 8:
+                return Response({'error': 'Password must be at least 8 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+            user.set_password(new_password)
+
+        # ─── Institutional Identity Sync ────────────────────
         user.first_name = data.get('first_name', user.first_name)
         user.last_name = data.get('last_name', user.last_name)
         user.email = data.get('email', user.email)
         user.save()
         
-        # Update Profile/Role models
-        from hospital.models import UserProfile
+        # Update Profile (Core Phone only)
         profile, _ = UserProfile.objects.get_or_create(user=user)
         profile.phone = data.get('phone', profile.phone)
-        profile.address = data.get('address', profile.address)
-        profile.bio = data.get('bio', profile.bio)
-        profile.symptoms = data.get('symptoms', profile.symptoms)
         profile.save()
 
+        # Update Specialized Role Tables
         if hasattr(user, 'doctor'):
             doc = user.doctor
             doc.mobile = data.get('phone', doc.mobile)
@@ -252,11 +353,11 @@ def me(request):
             pat.address = data.get('address', pat.address)
             pat.symptoms = data.get('symptoms', pat.symptoms)
             pat.save()
+
         # Invalidate cache after update
         cache.delete(f'user_me_{user.id}')
         
     # Try to serve from cache for GET requests
-    # Neural Cache Protection
     cache_key = f'user_me_{user.id}'
     # Bypass triggered for clinical identity synchronization
     # cached = cache.get(cache_key)
@@ -527,9 +628,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         role = getattr(user, 'profile', None) and user.profile.role or 'patient'
         if user.is_superuser or role == 'admin':
             if doctor_id:
-                qs = qs.filter(Q(doctorId=doctor_id) | Q(doctor_id=doctor_id))
+                qs = qs.filter(doctor_id=doctor_id)
             if patient_id:
-                qs = qs.filter(Q(patientId=patient_id) | Q(patient_id=patient_id))
+                qs = qs.filter(patient_id=patient_id)
         
         if appt_status:
             qs = qs.filter(status=appt_status)
@@ -553,11 +654,46 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         return Response({'message': 'Appointment cancelled.'})
 
     @action(detail=False, methods=['get'])
-    def today(self, request):
-        today = timezone.now().date()
-        appts = self.get_queryset().filter(appointment_date=today)
-        serializer = self.get_serializer(appts, many=True)
-        return Response(serializer.data)
+    def check_availability(self, request):
+        doctor_id = request.query_params.get('doctor')
+        app_date = request.query_params.get('date')
+        if not doctor_id or not app_date:
+            return Response({'error': 'Clinical context (Doctor/Date) required.'}, status=400)
+            
+        day_appts = Appointment.objects.filter(
+            doctor_id=doctor_id,
+            appointment_date=app_date,
+            status__in=['pending', 'confirmed', 'arrived', 'in-consultation']
+        )
+        
+        # Institutional Slot Map: 08:00 - 20:00 in 30-minute intervals
+        from datetime import datetime
+        slots = {}
+        for h in range(8, 20):
+            for m in [0, 30]:
+                key = f"{h:02d}:{m:02d}"
+                slots[key] = 0
+                
+        for a in day_appts:
+            if not a.appointment_time: continue
+            try:
+                # a.appointment_time is a datetime.time object
+                a_mins = a.appointment_time.hour * 60 + a.appointment_time.minute
+                # Clinical Interval Quantization (Floor to nearest 30)
+                floor_m = (a_mins // 30) * 30
+                key = f"{a.appointment_time.hour:02d}:{floor_m:02d}"
+                if key in slots:
+                    slots[key] += 1
+            except Exception as e:
+                print(f"Slot calc error in check_availability: {e}")
+                continue
+        
+        return Response({
+            'slots': slots, 
+            'capacity_per_interval': 3,
+            'operational_start': '08:00',
+            'operational_end': '20:00'
+        })
 
     def create(self, request, *args, **kwargs):
         doctor_id = request.data.get('doctor')
@@ -565,19 +701,50 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         app_time = request.data.get('appointment_time')
 
         if doctor_id and app_date and app_time:
-            # Enforce 30-minute strict slot intervals for timezone/overlap prevention
-            # To handle this robustly, we check for exact time overlap for now.
-            overlapping = Appointment.objects.filter(
-                doctor_id=doctor_id,
-                appointment_date=app_date,
-                appointment_time=app_time,
-                status__in=['pending', 'confirmed']
-            ).exists()
-            if overlapping:
-                return Response(
-                    {'error': 'This time slot is already booked for the selected doctor.'},
-                    status=status.HTTP_400_BAD_REQUEST
+            from datetime import datetime
+            try:
+                # ─── Clinical Capacity Throttling ───────────────────
+                # Max 3 appointments per 30-minute interval per doctor
+                req_dt = datetime.strptime(app_time, '%H:%M')
+                req_mins = req_dt.hour * 60 + req_dt.minute
+                
+                # Quantiize to 30-minute blocks (0, 30, 60...)
+                interval_start_min = (req_mins // 30) * 30
+                interval_end_min = interval_start_min + 30
+                
+                day_appts = Appointment.objects.filter(
+                    doctor_id=doctor_id,
+                    appointment_date=app_date,
+                    status__in=['pending', 'confirmed', 'arrived', 'in-consultation']
                 )
+                
+                conflict_count = 0
+                for a in day_appts:
+                    if not a.appointment_time: continue
+                    try:
+                        # a.appointment_time is a datetime.time object
+                        a_mins = a.appointment_time.hour * 60 + a.appointment_time.minute
+                        if interval_start_min <= a_mins < interval_end_min:
+                            conflict_count += 1
+                    except Exception as te:
+                        print(f"Slot calc error: {te}")
+                        continue
+                
+                if conflict_count >= 3:
+                    h_start, m_start = divmod(interval_start_min, 60)
+                    h_end, m_end = divmod(interval_end_min, 60)
+                    return Response(
+                        {'error': f'Institutional Capacity Overflow: The {h_start:02d}:{m_start:02d} - {h_end:02d}:{m_end:02d} interval is already at maximum occupancy (3/3 session slots). Please select an alternative slot.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Zero-Tolerance Exact Overlap Check (Legacy Safety)
+                if day_appts.filter(appointment_time=app_time).exists():
+                    return Response({'error': f'Dr. Slot Conflict: An appointment is already finalized at exactly {app_time}.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            except Exception as e:
+                print(f"Capacity check bypassed: {e}")
+                
         return super().create(request, *args, **kwargs)
 
 
@@ -639,6 +806,8 @@ class BillViewSet(viewsets.ModelViewSet):
         patient_id = self.request.query_params.get('patient_id')
         if bill_status:
             qs = qs.filter(status=bill_status)
+        if patient_id:
+            qs = qs.filter(patient_id=patient_id)
         return qs.order_by('-bill_date')
 
     @action(detail=True, methods=['post'])
@@ -824,7 +993,11 @@ class PharmacyItemViewSet(viewsets.ModelViewSet):
         data = (
             PharmacyItem.objects
             .values('category')
-            .annotate(total_units=Sum('stock_level'), item_count=Count('id'))
+            .annotate(
+                total_units=Sum('stock_level'), 
+                item_count=Count('id'),
+                avg_price=Avg('unit_price')
+            )
             .order_by('-total_units')
         )
         return Response(list(data))
@@ -971,6 +1144,8 @@ class LabTestViewSet(viewsets.ModelViewSet):
             qs = qs.none()
 
         patient_id = self.request.query_params.get('patient_id')
+        if patient_id:
+            qs = qs.filter(patient_id=patient_id)
         return qs
 
 
@@ -1162,3 +1337,20 @@ class StaffViewSet(viewsets.ModelViewSet):
         """Archive staff member for clinical accountability."""
         instance.is_active = False
         instance.save()
+
+
+class SupportMessageViewSet(viewsets.ModelViewSet):
+    queryset = SupportMessage.objects.all()
+    serializer_class = SupportMessageSerializer
+    
+    def get_permissions(self):
+        if self.action == 'create':
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        # Operational Restriction: Only clinical admins/receptionists can manage support logs.
+        user = self.request.user
+        if not user.is_staff:
+            return self.queryset.none()
+        return self.queryset.order_by('-created_at')

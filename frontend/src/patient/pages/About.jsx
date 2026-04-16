@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { HeartPulse, ShieldCheck, BrainCircuit, Globe, Award, Users, ArrowRight } from 'lucide-react';
+import { HeartPulse, ShieldCheck, Database, Globe, Award, Users, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Footer from '../components/Footer';
 
@@ -17,8 +17,8 @@ const LUNA = {
 
 const About = () => (
     <div className="min-h-screen" style={{ background: 'var(--luna-bg)' }}>
-        {/* Institutional Hero */}
-        <section className="pt-32 pb-12 relative overflow-hidden">
+        {/* Institutional Hero - Optimized for Mobile */}
+        <section className="pt-44 md:pt-56 pb-8 md:pb-12 relative overflow-hidden">
             {/* Background Architecture */}
             <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full opacity-[0.1]"
                 style={{ background: 'var(--luna-blue)', filter: 'blur(120px)' }} />
@@ -28,23 +28,19 @@ const About = () => (
             <div className="max-w-6xl mx-auto px-6 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-1 gap-12 text-center">
                     <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-                        <div className="section-tag mx-auto inline-flex mb-8 uppercase tracking-[0.3em] font-black"
-                            style={{ background: 'var(--luna-navy)', color: 'var(--luna-blue)', borderColor: 'var(--luna-border)' }}>
-                            <HeartPulse className="w-4 h-4" /> Mission Protocol
-                        </div>
-                        <h1 className="text-5xl md:text-7xl font-black mb-8 leading-[1.05] tracking-tighter" style={{ color: 'var(--luna-text-main)' }}>
+                        <h1 className="text-3xl md:text-7xl font-black mb-6 md:mb-8 leading-[1.05] tracking-tighter" style={{ color: 'var(--luna-text-main)' }}>
                             The Logic of <br />
                             <span className="text-gradient">Modern Healing.</span>
                         </h1>
-                        <p className="text-xl md:text-2xl max-w-4xl mx-auto leading-relaxed font-bold tracking-tight" style={{ color: 'var(--luna-text-main)', opacity: 0.9 }}>
-                            Engineered for high-performing clinical environments, Lifeline integrates AI intelligence with empathetic human care to establish the new global standard for hospital management.
+                        <p className="text-sm md:text-2xl max-w-4xl mx-auto leading-relaxed font-bold tracking-tight opacity-70 md:opacity-90" style={{ color: 'var(--luna-text-main)' }}>
+                            Engineered for high-performing clinical environments, Lifeline integrates secure institutional data layers with empathetic human care to establish the new global standard for hospital management.
                         </p>
 
                         <div className="flex flex-wrap justify-center gap-8 mb-16">
                             {[
                                 { label: 'Global Reach', value: '450+', sub: 'Medical Facilities' },
                                 { label: 'Data Integrity', value: '99.9%', sub: 'Uptime Protocol' },
-                                { label: 'AI Accuracy', value: '97.2%', sub: 'Diagnostic Assist' },
+                                { label: 'Audit Compliance', value: '100%', sub: 'Regulatory Success' },
                             ].map((s, i) => (
                                 <div key={i} className="text-center px-8 border-r last:border-0" style={{ borderColor: 'var(--luna-border)' }}>
                                     <p className="text-4xl font-black tracking-tighter mb-1" style={{ color: 'var(--luna-blue)' }}>{s.value}</p>
@@ -63,9 +59,6 @@ const About = () => (
             <div className="max-w-7xl mx-auto px-6 relative z-10">
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-8">
                     <div className="max-w-2xl">
-                        <div className="section-tag inline-flex mb-4 uppercase tracking-[.2em] font-black" style={{ background: 'var(--luna-navy)', color: 'var(--luna-blue)', borderColor: 'var(--luna-border)' }}>
-                            <ShieldCheck className="w-4 h-4" /> Our Pillars
-                        </div>
                         <h2 className="text-4xl md:text-5xl font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Foundation of Excellence</h2>
                     </div>
                     <p className="text-lg font-black tracking-tight md:text-right max-w-md" style={{ color: 'var(--luna-text-main)', opacity: 0.8 }}>
@@ -76,7 +69,7 @@ const About = () => (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     {[
                         { icon: <ShieldCheck className="w-8 h-8" />, title: 'Absolute Data Privacy', desc: 'Implementing HIPAA and military-grade AES-256 encryption at every touchpoint of patient data.', color: 'var(--luna-blue)' },
-                        { icon: <BrainCircuit className="w-8 h-8" />, title: 'Cognitive Assistance', desc: 'Leveraging AI Neural networks to assist specialists in real-time diagnostic and rescheduling protocols.', color: 'var(--luna-blue)' },
+                        { icon: <Database className="w-8 h-8" />, title: 'Resource Optimization', desc: 'Implementing advanced logic to assist specialists in real-time ward balancing and optimal scheduling protocols.', color: 'var(--luna-blue)' },
                         { icon: <Globe className="w-8 h-8" />, title: 'Global Interoperability', desc: 'Seamlessly syncing with international healthcare standards to eliminate boundaries in patient care.', color: 'var(--luna-blue)' },
                     ].map((v, i) => (
                         <div key={i} className="card-clinical p-12 group transition-all hover:-translate-y-2 border shadow-2xl" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
@@ -97,9 +90,6 @@ const About = () => (
             <div className="max-w-7xl mx-auto px-6">
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-8">
                     <div>
-                        <div className="section-tag inline-flex mb-4 uppercase tracking-[.2em] font-black" style={{ borderColor: 'var(--luna-border)' }}>
-                            <Users className="w-4 h-4" /> Leadership
-                        </div>
                         <h2 className="text-3xl md:text-4xl font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Medical Governance Board</h2>
                     </div>
                 </div>
@@ -107,7 +97,7 @@ const About = () => (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                     {[
                         { name: 'Dr.Saashwati', role: 'Chief Medical Officer', dept: 'Clinical Compliance', tag: 'MD/Surgery' },
-                        { name: 'Hong Emily', role: 'Chief Technology Officer', dept: 'AI Neural Core', tag: 'PhD AI' },
+                        { name: 'Hong Emily', role: 'Chief Information Officer', dept: 'Enterprise Infrastructure', tag: 'PhD Systems' },
                         { name: 'Tanushree', role: 'Compliance Officer', dept: 'Legal & Ethics', tag: 'LLB/Ethics' },
                         { name: 'Shrutika', role: 'Lead Data Architect', dept: 'System Integrity', tag: 'Cloud Sec' },
                     ].map((m, i) => (
@@ -133,7 +123,7 @@ const About = () => (
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(var(--luna-blue) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
             <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
                 <h2 className="text-4xl md:text-5xl font-black mb-8 leading-tight tracking-tighter" style={{ color: 'var(--luna-text-main)' }}>Ready for the Next Generation of Care?</h2>
-                <p className="text-[20px] font-black mb-12 max-w-2xl mx-auto" style={{ color: 'var(--luna-text-main)', opacity: 0.9 }}>Join the elite circle of healthcare facilities using the Lifeline Intelligence System.</p>
+                <p className="text-[20px] font-black mb-12 max-w-2xl mx-auto" style={{ color: 'var(--luna-text-main)', opacity: 0.9 }}>Join the elite circle of healthcare facilities using the Lifeline Clinical OS.</p>
                 <div className="flex justify-center gap-6">
                     <Link to="/patient/signup" className="btn-teal px-12 py-5 text-sm font-black uppercase tracking-widest shadow-2xl">
                         Initialize Console <ArrowRight className="w-5 h-5 ml-2" />

@@ -123,8 +123,6 @@ class Appointment(models.Model):
 
 # --- SECURE TELE-CONSULTATION FRAMEWORK ---
 
-# --- SECURE TELE-CONSULTATION FRAMEWORK ---
-
 class TeleConsultationSession(models.Model):
     STATUS_CHOICES = [('live', 'Live'), ('completed', 'Completed'), ('cancelled', 'Cancelled')]
     
@@ -171,6 +169,7 @@ class MedicalRecord(models.Model):
     follow_up_date = models.DateField(null=True, blank=True)
     is_confidential = models.BooleanField(default=False)
     vitals = models.JSONField(default=dict, blank=True)
+    prescription_pdf = models.FileField(upload_to='prescriptions/', null=True, blank=True)
     updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='updated_records')
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -231,6 +230,20 @@ class Notification(models.Model):
         ordering = ['-created_at']
 
     def __str__(self): return f"{self.title} → {self.user.username}"
+
+class SupportMessage(models.Model):
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    subject = models.CharField(max_length=200)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'support_messages'
+        ordering = ['-created_at']
+
+    def __str__(self): return f"Message from {self.name} - {self.subject}"
 
 # --- PHARMACY & LABORATORY ---
 

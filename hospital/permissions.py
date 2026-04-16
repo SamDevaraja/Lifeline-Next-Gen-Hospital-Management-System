@@ -25,7 +25,7 @@ class RBACPermission(permissions.BasePermission):
 
         # Fast-track route checking using URL name for function-based views
         url_name = getattr(request.resolver_match, 'url_name', '')
-        if url_name in ['me', 'dashboard_stats', 'ai_chat', 'public_stats']:
+        if url_name in ['me', 'dashboard_stats', 'public_stats']:
             return True
 
         view_name = view.__class__.__name__
@@ -39,7 +39,7 @@ class RBACPermission(permissions.BasePermission):
             return view_name in allowed_views
 
         if role == 'patient':
-            allowed_views = ['AppointmentViewSet', 'PrescriptionViewSet', 'MedicalRecordViewSet', 'BillViewSet', 'NotificationViewSet', 'PatientViewSet', 'DoctorViewSet', 'TeleConsultationViewSet']
+            allowed_views = ['AppointmentViewSet', 'PrescriptionViewSet', 'MedicalRecordViewSet', 'BillViewSet', 'NotificationViewSet', 'PatientViewSet', 'DoctorViewSet', 'TeleConsultationViewSet', 'LabTestViewSet']
             return view_name in allowed_views
             
         if role == 'receptionist':

@@ -88,9 +88,9 @@ const TelemedicinePage = ({ user }) => {
                 
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
-                        <h1 className="text-2xl font-black mb-1" style={{ color: 'var(--luna-text-main)' }}>Specialist Tele-Consultation Terminal</h1>
+                        <h1 className="text-2xl font-black mb-1" style={{ color: 'var(--luna-text-main)' }}>Telemedicine Portal</h1>
                         <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest flex items-center gap-2 text-[var(--luna-teal)]">
-                            <ShieldCheck className="w-3.5 h-3.5" /> GMeet Clinical Vanguard Protocol - Zero-Trust
+                            <ShieldCheck className="w-3.5 h-3.5" /> Secure Video Consultation System
                         </p>
                     </div>
                     <div className="flex items-center gap-4">
@@ -123,7 +123,21 @@ const TelemedicinePage = ({ user }) => {
                         </thead>
                         <tbody className="divide-y" style={{ divideColor: 'var(--luna-border)' }}>
                             <AnimatePresence>
-                                {filteredAppts.map((appt, idx) => (
+                                {filteredAppts.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="4" className="py-28 text-center" style={{ color: 'var(--luna-text-main)' }}>
+                                            <div className="flex flex-col items-center">
+                                                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-3 border border-white/5 opacity-20">
+                                                    <Search className="w-6 h-6" />
+                                                </div>
+                                                <h3 className="text-sm font-bold tracking-[0.2em] opacity-40 uppercase mb-1">No Results Found</h3>
+                                                <p className="text-xs font-semibold opacity-30 max-w-[320px] leading-relaxed">
+                                                    No matches found. Please try a different search term.
+                                                </p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : filteredAppts.map((appt, idx) => (
                                     <motion.tr 
                                         key={appt.id} 
                                         initial={{ opacity: 0, x: -10 }} 

@@ -18,7 +18,6 @@ const LabPage = ({ user }) => {
 
     // --- Core Data State ---
     const [tests, setTests] = useState([]);
-    const [aiDiagnoses, setAiDiagnoses] = useState([]);
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -36,24 +35,12 @@ const LabPage = ({ user }) => {
         if (!isSilent) setLoading(true);
         else setRefreshing(true);
         try {
-            let testsUrl = 'lab-tests/';
-            let aiUrl = 'ai-diagnoses/';
-            
-            if (user?.role === 'doctor') {
-                testsUrl += `?doctor_id=${user.id}`;
-            } else if (user?.role === 'patient') {
-                testsUrl += `?patient_id=${user.id}`;
-                aiUrl += `?patient_id=${user.id}`;
-            }
-
-            const [testsRes, aiRes, patRes] = await Promise.all([
+            const testsUrl = 'lab-tests/';
+            const [testsRes, patRes] = await Promise.all([
                 api.get(testsUrl),
-                api.get(aiUrl).catch(() => ({ data: [] })),
                 api.get('patients/').catch(() => ({ data: [] }))
             ]);
-
             setTests(testsRes.data);
-            setAiDiagnoses(aiRes.data);
             setPatients(patRes.data);
         } catch (err) {
             console.error('Data sync failed:', err);
@@ -71,7 +58,6 @@ const LabPage = ({ user }) => {
 
     // --- Derived Data ---
     const secureTests = useMemo(() => Array.isArray(tests) ? tests : (tests?.results || []), [tests]);
-    const secureAI = useMemo(() => Array.isArray(aiDiagnoses) ? aiDiagnoses : (aiDiagnoses?.results || []), [aiDiagnoses]);
     const securePatients = useMemo(() => Array.isArray(patients) ? patients : (patients?.results || []), [patients]);
 
     const abnormalCount = useMemo(() => secureTests.filter(t => t.is_abnormal).length, [secureTests]);
@@ -96,21 +82,6 @@ const LabPage = ({ user }) => {
         return list;
     }, [secureTests, selectedPatientId, activeTab, searchTerm]);
 
-    const filteredAI = useMemo(() => {
-        let list = [...secureAI];
-        if (selectedPatientId) {
-            list = list.filter(d => d.patient === selectedPatientId);
-        }
-        
-        const search = searchTerm.toLowerCase();
-        if (search) {
-            list = list.filter(d => 
-                (d.input_symptoms && d.input_symptoms.toLowerCase().includes(search)) ||
-                (Array.isArray(d.suggested_conditions) && d.suggested_conditions.some(c => c && c.toLowerCase().includes(search)))
-            );
-        }
-        return list;
-    }, [secureAI, selectedPatientId, searchTerm]);
 
     // --- Handlers ---
     const handleNewTest = async (values) => {
@@ -177,7 +148,7 @@ const LabPage = ({ user }) => {
                     { key: 'reference_range', label: 'Biological Reference Range', type: 'text', placeholder: 'e.g. 13.5 - 17.5' },
                     { key: 'is_abnormal', label: 'Abnormal Flag', type: 'select', options: [{ label: 'Normal Result', value: 'false' }, { label: 'Abnormal / High Priority', value: 'true' }] },
                     { key: 'image_data', label: 'Diagnostic Scan / Image (Optional)', type: 'file', fullWidth: true },
-                    { key: 'ai_flag_reason', label: 'Clinical Commentary', type: 'text', placeholder: 'Institutional notes or automated flags...', fullWidth: true },
+                    { key: 'notes', label: 'Clinical Commentary', type: 'text', placeholder: 'Institutional notes or doctor commentary...', fullWidth: true },
                 ]}
             />
 
@@ -190,10 +161,11 @@ const LabPage = ({ user }) => {
                     
                     <header className="px-8 flex items-center justify-between py-5 border-b shrink-0 gap-6" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-background-secondary)' }}>
                         <div className="flex flex-col flex-shrink-0">
-                            <h1 className="text-xl font-black uppercase tracking-tight" style={textMain}>Clinical Diagnostics Hub</h1>
-                            <div className="flex items-center gap-2 mt-1">
-                                <div className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
-                                <p className="text-[10px] font-black uppercase tracking-widest opacity-50">System-wide AI sync active</p>
+                            <div>
+                                <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>
+                                    <FlaskConical className="w-6 h-6 inline mr-2 text-rose-500" /> Medical Lab Tests
+                                </h1>
+                                <p className="text-xs font-bold mt-1" style={{ color: 'var(--luna-text-dim)' }}>Track and manage all diagnostic lab reports.</p>
                             </div>
                         </div>
 
@@ -206,7 +178,7 @@ const LabPage = ({ user }) => {
                                     <button 
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`flex items-center justify-center gap-2 px-5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all h-full ${activeTab === tab.id ? 'bg-[#7c3aed] text-white shadow-md' : 'opacity-50 hover:opacity-100'}`}
+                                        className={`flex items-center justify-center gap-2 px-5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all h-full ${activeTab === tab.id ? 'bg-primary text-white shadow-md' : 'opacity-50 hover:opacity-100'}`}
                                     >
                                         {tab.icon} {tab.label}
                                     </button>
@@ -219,14 +191,14 @@ const LabPage = ({ user }) => {
                                     value={searchTerm}
                                     onChange={e => setSearchTerm(e.target.value)}
                                     placeholder="Filter condition..."
-                                    className="w-full bg-slate-50/5 pl-11 pr-4 h-11 rounded-xl text-xs font-black uppercase border outline-none focus:border-[#7c3aed]/50 transition-all tracking-widest placeholder:opacity-50"
+                                    className="w-full bg-slate-50/5 pl-11 pr-4 h-11 rounded-xl text-xs font-black uppercase border outline-none focus:border-primary/50 transition-all tracking-widest placeholder:opacity-50"
                                     style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-main)' }}
                                 />
                             </div>
 
                             <button 
                                 onClick={() => setShowNewTestModal(true)}
-                                className="px-5 h-11 bg-[#7c3aed] shrink-0 text-white rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2.5 transition-all hover:bg-[#6d28d9] active:scale-95 shadow-lg shadow-[#7c3aed]/20"
+                                className="px-5 h-11 bg-primary shrink-0 text-white rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2.5 transition-all hover:bg-primary-hover active:scale-95 shadow-lg shadow-primary/20"
                             >
                                 <Plus className="w-4 h-4" /> New Entry
                             </button>
@@ -302,9 +274,16 @@ const LabPage = ({ user }) => {
                                             </motion.tr>
                                         )) : (
                                             <tr>
-                                                <td colSpan="5" className="py-24 text-center opacity-20">
-                                                    <Database className="w-16 h-16 mx-auto mb-4" style={textMain} />
-                                                    <p className="text-xs font-black uppercase tracking-widest" style={textMain}>No Diagnostic Matches Found</p>
+                                                <td colSpan="5" className="py-28 text-center" style={{ color: 'var(--luna-text-main)' }}>
+                                                    <div className="flex flex-col items-center">
+                                                        <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-3 border border-white/5 opacity-20">
+                                                            <Search className="w-6 h-6" />
+                                                        </div>
+                                                        <h3 className="text-sm font-bold tracking-[0.2em] opacity-40 uppercase mb-1">No Results Found</h3>
+                                                        <p className="text-xs font-semibold opacity-30 max-w-[320px] leading-relaxed">
+                                                            No matches found. Please try a different search term.
+                                                        </p>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         )}

@@ -21,10 +21,11 @@ const StaffAppContent = () => {
     <div className="min-h-screen">
       {!isDashboard && <Navbar />}
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Login />} />
+        <Route path="/home" element={<Home />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
-                <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/check-email" element={<CheckEmail />} />
         <Route path="/verify-email/:key" element={<VerifyEmail />} />
         <Route path="/reset-password" element={<ForgotPassword />} />

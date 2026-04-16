@@ -7,6 +7,8 @@ export default {
     theme: {
         extend: {
             colors: {
+                primary: 'var(--luna-primary)',
+                'primary-hover': 'var(--luna-primary-hover)',
                 luna: {
                     sky: '#38bdf8',
                     teal: '#0ea5e9',

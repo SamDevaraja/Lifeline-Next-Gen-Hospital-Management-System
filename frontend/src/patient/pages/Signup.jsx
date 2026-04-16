@@ -95,7 +95,8 @@ const Signup = () => {
                 toast.success('Sign up completed via Google!', { id: loadingId });
                 
                 setTimeout(() => {
-                    navigate('/dashboard');
+                    const role = (userRes.data.role || '').toLowerCase();
+                    navigate(role === 'patient' ? '/patient/dashboard' : '/dashboard');
                 }, 1000);
             } catch (err) {
                 toast.error('Google Sign-In failed or email already registered natively.', { id: loadingId });
@@ -108,37 +109,37 @@ const Signup = () => {
     const roles = [];
 
     return (
-        <div className="min-h-screen pt-28 pb-20 flex items-start justify-center px-6" style={{ background: 'var(--luna-bg)' }}>
+        <div className="min-h-screen pt-20 md:pt-32 pb-10 md:pb-20 flex items-start justify-center px-4 md:px-6" style={{ background: 'var(--luna-bg)' }}>
             <Toaster position="top-right" toastOptions={{ style: { borderRadius: '12px', fontWeight: 600 } }} />
 
             <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
-                className="w-full max-w-2xl border rounded-[2.5rem] p-10 shadow-2xl"
+                className="w-full max-w-2xl border rounded-[1.75rem] md:rounded-[2.5rem] p-5 md:p-12 shadow-2xl"
                 style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
 
                 <div className="text-center mb-10">
-                    <h1 className="text-3xl font-black mb-2 tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Create Account</h1>
-                    <p className="font-bold text-[15px]" style={{ color: 'var(--luna-text-main)', opacity: 0.8 }}>Join the Lifeline patient network</p>
+                    <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Create Account</h1>
+                    <p className="font-bold text-sm md:text-[15px]" style={{ color: 'var(--luna-text-main)', opacity: 0.8 }}>Join the Lifeline patient network</p>
                 </div>
 
-                <p className="text-sm text-center mb-8 px-4 py-3 rounded-xl font-bold" style={{ background: 'var(--luna-navy)', color: 'var(--luna-text-main)', opacity: 0.8 }}>
-                    Create your patient profile to access the clinical network. Physicians must request clinical access directly from the IT department.
+                <p className="text-[12px] md:text-sm text-center mb-8 px-5 py-4 rounded-2xl font-bold leading-relaxed" style={{ background: 'var(--luna-navy)', color: 'var(--luna-text-main)', opacity: 0.82 }}>
+                    Create your patient profile to access the institutional network. Physicians must request professional access directly from the administration.
                 </p>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
-                    <div className="grid grid-cols-2 gap-5">
+                <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                         <SignupField label="First Name" icon={<User className="w-4 h-4" />} value={form.firstName} onChange={update('firstName')} placeholder="Enter legal first name" id="signup-firstname" />
                         <SignupField label="Last Name" icon={<User className="w-4 h-4" />} value={form.lastName} onChange={update('lastName')} placeholder="Enter legal last name" id="signup-lastname" />
                     </div>
                     <SignupField label="Email Address" icon={<Mail className="w-4 h-4" />} value={form.email} onChange={update('email')} placeholder="official@hospital.com" type="email" id="signup-email" />
                     <SignupField label="Username" icon={<User className="w-4 h-4" />} value={form.username} onChange={update('username')} placeholder="Create a unique username" id="signup-username" />
 
-                    <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                         <SignupField label="Mobile" icon={<Phone className="w-4 h-4" />} value={form.mobile} onChange={update('mobile')} placeholder="+91-00000-00000" id="signup-mobile" />
                         <SignupField label="City/Address" icon={<MapPin className="w-4 h-4" />} value={form.address} onChange={update('address')} placeholder="City, State, Zip Code" id="signup-address" />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-black uppercase tracking-widest mb-2.5" style={{ color: 'var(--luna-text-main)', opacity: 0.8 }}>Primary Symptoms (optional)</label>
+                        <label className="block text-sm font-black uppercase tracking-wider mb-2.5" style={{ color: 'var(--luna-text-main)', opacity: 0.8 }}>Primary Symptoms (optional)</label>
                         <div className="relative">
                             <div className="absolute left-5 top-1/2 -translate-y-1/2 z-10 pointer-events-none" style={{ color: LUNA.teal }}>
                                 <HeartPulse className="w-4 h-4" />
@@ -148,9 +149,9 @@ const Signup = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                         <div>
-                            <label className="block text-sm font-black uppercase tracking-widest mb-2.5" style={{ color: 'var(--luna-text-main)', opacity: 0.8 }}>Password</label>
+                            <label className="block text-sm font-black uppercase tracking-wider mb-2.5" style={{ color: 'var(--luna-text-main)', opacity: 0.8 }}>Password</label>
                             <div className="relative">
                                 <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 z-10 pointer-events-none" style={{ color: LUNA.teal }} />
                                 <input id="signup-password" type={showPw ? 'text' : 'password'} value={form.password}
@@ -162,7 +163,7 @@ const Signup = () => {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-black uppercase tracking-widest mb-2.5" style={{ color: 'var(--luna-text-main)', opacity: 0.8 }}>Confirm Password</label>
+                            <label className="block text-sm font-black uppercase tracking-wider mb-2.5" style={{ color: 'var(--luna-text-main)', opacity: 0.8 }}>Confirm Password</label>
                             <div className="relative">
                                 <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 z-10 pointer-events-none" style={{ color: LUNA.teal }} />
                                 <input id="signup-confirm" type={showPw ? 'text' : 'password'} value={form.confirm}
@@ -195,7 +196,7 @@ const Signup = () => {
                     </label>
 
                     <button id="signup-submit-btn" type="submit" className="w-full btn-teal py-4 text-base mt-2">
-                        Request Access <ArrowRight className="w-5 h-5" />
+                        Create Account <ArrowRight className="w-5 h-5" />
                     </button>
                 </form>
 
@@ -233,7 +234,7 @@ const Signup = () => {
 
 const SignupField = ({ label, icon, value, onChange, placeholder, type = 'text', id }) => (
     <div>
-        <label htmlFor={id} className="block text-sm font-black uppercase tracking-[0.15em] mb-2.5 opacity-85" style={{ color: 'var(--luna-text-main)' }}>{label}</label>
+        <label htmlFor={id} className="block text-sm font-black uppercase tracking-wider mb-2.5 opacity-85" style={{ color: 'var(--luna-text-main)' }}>{label}</label>
         <div className="relative">
             <div className="absolute left-5 top-1/2 -translate-y-1/2 z-10 pointer-events-none" style={{ color: LUNA.teal }}>{icon}</div>
             <input id={id} type={type} value={value} onChange={onChange} placeholder={placeholder} className="input !pl-14" required />

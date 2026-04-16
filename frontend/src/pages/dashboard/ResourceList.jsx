@@ -21,7 +21,7 @@ const ResourceList = ({ type, title, user }) => {
     const isReceptionist = role === 'receptionist';
     const isNurse = role === 'nurse';
 
-    const canCreate = isAdmin || (type === 'patients' && (isReceptionist || isDoctor || isNurse));
+    const canCreate = isAdmin || (type === 'patients' && (isReceptionist || isNurse));
     const canEdit = canCreate;
     const canDelete = isAdmin;
     const [data, setData] = useState([]);
@@ -32,6 +32,7 @@ const ResourceList = ({ type, title, user }) => {
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
     const [inputModal, setInputModal] = useState({ open: false, mode: 'create', item: null });
     const [detailsModal, setDetailsModal] = useState({ open: false, item: null });
+    const colCount = type === 'doctors' ? 6 : (isDoctor ? 5 : 6);
 
     useEffect(() => {
         const load = async () => {
@@ -44,7 +45,7 @@ const ResourceList = ({ type, title, user }) => {
                     setDoctorsList(dr.data.filter(d => Boolean(d.status)));
                 }
             } catch (err) {
-                toast.error("Failed to load clinical records.");
+                toast.error("Failed to load medical records.");
             }
             setLoading(false);
         };
@@ -55,22 +56,22 @@ const ResourceList = ({ type, title, user }) => {
         if (!confirmDelete.id) return;
         const id = confirmDelete.id;
         try {
-            toast.loading("Purging clinical record...", { id: 'archive' });
+            toast.loading("Deleting record...", { id: 'archive' });
             await api.delete(`${type}/${id}/`);
-            toast.success("Record legally archived & locked.", { id: 'archive' });
+            toast.success("Record deleted successfully.", { id: 'archive' });
             setConfirmDelete({ open: false, id: null });
             setData(prev => prev.filter(i => String(i.id) !== String(id)));
         } catch (err) {
             console.error("Delete Error:", err);
             const msg = err.response?.data?.detail || err.message || "Operation failed.";
-            toast.error(`System Protocol Error: ${msg}`, { id: 'archive' });
+            toast.error(`Error: ${msg}`, { id: 'archive' });
             setConfirmDelete({ open: false, id: null });
         }
     };
 
     const handleCreateEdit = async (vals) => {
         try {
-            toast.loading(inputModal.mode === 'create' ? "Authenticating & generating record..." : "Committing changes...", { id: 'save' });
+            toast.loading(inputModal.mode === 'create' ? "Creating record..." : "Saving changes...", { id: 'save' });
             
             if (inputModal.mode === 'create') {
                 if (type === 'doctors') {
@@ -218,7 +219,7 @@ const ResourceList = ({ type, title, user }) => {
         });
     }, [data, search, statusFilter, type]);
 
-    const DOCTOR_FIELDS = inputModal.mode === 'create' ? [
+    const DOCTOR_FIELDS = React.useMemo(() => inputModal.mode === 'create' ? [
         { key: 'first_name', label: 'First Name', placeholder: 'Dr. John', icon: <User className="w-4 h-4"/> },
         { key: 'last_name', label: 'Last Name', placeholder: 'Doe', icon: <User className="w-4 h-4"/> },
         { key: 'email', label: 'Official Email', placeholder: 'doctor@hospital.com', type: 'email', icon: <Mail className="w-4 h-4"/> },
@@ -256,9 +257,9 @@ const ResourceList = ({ type, title, user }) => {
         ]},
         { key: 'username', label: 'System Alias (Login ID)', initialValue: inputModal.item?.user?.username, disabled: true },
         { key: 'password', label: 'Override Auth Password', placeholder: 'Leave blank to keep unchanged', type: 'password' }
-    ];
+    ], [inputModal.mode, inputModal.item]);
 
-    const PATIENT_FIELDS = inputModal.mode === 'create' ? [
+    const PATIENT_FIELDS = React.useMemo(() => inputModal.mode === 'create' ? [
         { key: 'first_name', label: 'First Name', placeholder: 'Jane', icon: <User className="w-4 h-4" /> },
         { key: 'last_name', label: 'Last Name', placeholder: 'Smith', icon: <User className="w-4 h-4" /> },
         { key: 'username', label: 'System Alias (Login)', placeholder: 'jane_s', icon: <QrCode className="w-4 h-4" /> },
@@ -299,7 +300,7 @@ const ResourceList = ({ type, title, user }) => {
         ]},
         !isDoctor && { key: 'assigned_doctor', label: 'Assigned Lead Specialist', type: 'select', initialValue: inputModal.item?.assigned_doctor, options: doctorsList.map(d => ({label: `Dr. ${d.get_name || d.user?.first_name}`, value: d.id})) },
         { key: 'symptoms', label: 'Current Chief Complaint (Symptoms)', initialValue: inputModal.item?.symptoms, fullWidth: true }
-    ].filter(Boolean);
+    ].filter(Boolean), [inputModal.mode, inputModal.item, isDoctor, doctorsList]);
 
     const getRiskColors = (level) => {
         switch(level) {
@@ -311,7 +312,7 @@ const ResourceList = ({ type, title, user }) => {
     };
 
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
             <ConfirmModal
                 isOpen={confirmDelete.open}
                 title={`Purge ${type === 'doctors' ? 'Specialist' : 'Patient'} Record`}
@@ -336,89 +337,119 @@ const ResourceList = ({ type, title, user }) => {
             
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold" style={{ color: 'var(--luna-text-main)' }}>{title}</h1>
-                    <p className="text-sm font-medium mt-1" style={{ color: 'var(--luna-text-muted)' }}>
+                    <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>{title}</h1>
+                    <p className="text-[10px] font-black uppercase tracking-[0.15em] opacity-40 mt-1" style={{ color: 'var(--luna-text-muted)' }}>
                         {loading ? 'Decrypting records...' : `Total Registered: ${filtered.length}`}
                     </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 transition-colors group-focus-within:text-teal-400" style={{ color: LUNA.teal }} />
+                <div className={`grid grid-cols-1 ${canCreate ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2 w-full md:w-auto`}>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-30" />
                         <input
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             type="text"
                             placeholder={`Scan ${type}...`}
-                            className="w-48 md:w-64 !pl-12 py-3 text-sm rounded-xl outline-none transition-all border shadow-inner font-bold tracking-tight focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/20"
-                            style={{ background: 'var(--luna-navy)', color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}
+                            className="w-full pl-9 pr-3 py-2 text-xs border rounded-lg outline-none transition-all font-bold tracking-tight bg-[var(--luna-card)]"
+                            style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}
                         />
                     </div>
 
-                    <div className="relative group">
+                    <div className="relative">
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="border rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.15em] focus:ring-4 focus:ring-blue-500/10 outline-none cursor-pointer transition-all appearance-none pr-10 shadow-lg h-[46px]"
-                            style={{ background: 'var(--luna-navy)', color: theme === 'dark' ? 'white' : 'var(--luna-blue)', borderColor: 'var(--luna-border)' }}
+                            className="w-full pl-3 pr-8 py-2 text-xs border rounded-lg appearance-none cursor-pointer focus:outline-none bg-[var(--luna-card)]"
+                            style={{ color: theme === 'dark' ? 'white' : 'var(--luna-blue)', borderColor: 'var(--luna-border)' }}
                         >
                             {filterOptions.map(f => (
-                                <option key={f} value={f} className="font-black" style={{ background: 'var(--luna-card)', color: theme === 'dark' ? 'white' : 'var(--luna-blue)', fontWeight: '900' }}>
-                                    {f === 'all' ? `All ${type === 'doctors' ? 'Depts' : 'Status'}` : f}
+                                <option key={f} value={f} style={{ background: 'var(--luna-card)', color: 'var(--luna-text-main)' }}>
+                                    {f === 'all' ? (type === 'doctors' ? `All Depts` : `All Risks`) : f}
                                 </option>
                             ))}
                         </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none transition-colors group-hover:scale-110" style={{ color: theme === 'dark' ? 'white' : 'var(--luna-blue)' }}>
-                            <Filter className="w-3.5 h-3.5" />
-                        </div>
+                        <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 opacity-30 pointer-events-none" />
                     </div>
 
                     {canCreate && (
                         <button
                             onClick={() => setInputModal({ open: true, mode: 'create', item: null })}
-                            className="btn-teal text-[10px] font-black uppercase tracking-widest px-6 h-[46px] flex items-center gap-2 shadow-xl hover:shadow-teal-500/30">
-                            <Plus className="w-4 h-4" /> Initialize Protocol
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-hover transition-colors shadow-sm">
+                            <Plus className="w-3.5 h-3.5" /> Add {type === 'doctors' ? 'Specialist' : 'Patient'}
                         </button>
                     )}
                 </div>
             </div>
 
-            <div className="card overflow-hidden p-0 shadow-2xl rounded-2xl" border={{ border: '1px solid var(--luna-border)' }}>
+            {/* Mini Stats Row - Consistency with Pharmacy */}
+            {type === 'doctors' && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                        { label: 'Specialists', value: data.length, color: 'var(--luna-teal)' },
+                        { label: 'Active', value: data.filter(d => d.status).length, color: '#10b981' },
+                        { label: 'Departments', value: new Set(data.map(d => d.department)).size, color: '#6366f1' },
+                        { label: 'Systems', value: 'Live', color: '#f59e0b' },
+                    ].map((s, i) => (
+                        <div key={i} className="p-3 border rounded-xl" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                            <p className="text-[9px] font-bold uppercase tracking-[0.2em] opacity-40 mb-0.5" style={{ fontFamily: "'Inter', sans-serif" }}>{s.label}</p>
+                            <p className="text-xl font-extrabold" style={{ color: s.color, fontFamily: "'Inter', sans-serif" }}>{s.value}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            <div className="card shadow-2xl !p-0 overflow-hidden border rounded-none" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
                 <div className="overflow-x-auto custom-scrollbar">
                     <table className="w-full text-left table-fixed">
                         <thead>
-                            <tr style={{ background: 'var(--luna-navy)', borderBottom: '1px solid var(--luna-border)' }}>
-                                <th className="text-left pl-6 pr-4 py-4 whitespace-nowrap text-[10px] font-black uppercase tracking-[0.2em] opacity-60 w-[22%]" style={{ color: 'var(--luna-text-main)' }}>{type === 'doctors' ? 'Dr. Profile' : 'Patient Demographics'}</th>
+                            <tr className="border-b" style={{ borderColor: 'var(--luna-border)', background: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc' }}>
+                                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em]" 
+                                    style={{ 
+                                        color: 'var(--luna-text-dim)', 
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                        width: type === 'doctors' ? '22%' : (isDoctor ? '40%' : '22%') 
+                                    }}>
+                                    {type === 'doctors' ? 'Dr. Profile' : 'Patient Demographics'}
+                                </th>
                                 {type === 'doctors' ? (
                                     <>
-                                        <th className="text-left py-4 px-4 whitespace-nowrap text-[10px] font-black uppercase tracking-[0.2em] opacity-60 w-[20%]" style={{ color: 'var(--luna-text-main)' }}>Department</th>
-                                        <th className="text-center py-4 px-4 whitespace-nowrap text-[10px] font-black uppercase tracking-[0.2em] opacity-60 w-[15%]" style={{ color: 'var(--luna-text-main)' }}>Consultation Fee</th>
+                                        <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell w-[18%]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Department</th>
+                                        <th className="text-center px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden md:table-cell w-[12%]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Experience</th>
+                                        <th className="text-center px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell w-[15%]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Consultation Fee</th>
                                     </>
                                 ) : (
                                     <>
-                                        <th className="text-center py-4 px-2 whitespace-nowrap text-[10px] font-black uppercase tracking-[0.2em] opacity-60 w-[10%]" style={{ color: 'var(--luna-text-main)' }}>Blood Grp</th>
-                                        <th className="text-center py-4 px-2 whitespace-nowrap text-[10px] font-black uppercase tracking-[0.2em] opacity-60 w-[12%]" style={{ color: 'var(--luna-text-main)' }}>Triage Risk</th>
-                                        <th className="text-left py-4 px-4 whitespace-nowrap text-[10px] font-black uppercase tracking-[0.2em] opacity-60 w-[15%]" style={{ color: 'var(--luna-text-main)' }}>Assigned Doctor</th>
+                                        <th className="text-center px-2 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif", width: isDoctor ? '12%' : '10%' }}>Blood Grp</th>
+                                        <th className="text-center px-2 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif", width: isDoctor ? '14%' : '12%' }}>Triage Risk</th>
+                                        {!isDoctor && (
+                                            <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell w-[15%]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Assigned Doctor</th>
+                                        )}
                                     </>
                                 )}
-                                <th className="text-center py-4 px-4 whitespace-nowrap text-[10px] font-black uppercase tracking-[0.2em] opacity-60 w-[12%]" style={{ color: 'var(--luna-text-main)' }}>Status Layer</th>
-                                <th className="text-center py-4 px-4 whitespace-nowrap text-[10px] font-black uppercase tracking-[0.2em] opacity-60 w-[15%]" style={{ color: 'var(--luna-text-main)' }}>Terminal Actions</th>
+                                <th className="text-center px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif", width: type === 'doctors' ? '12%' : (isDoctor ? '14%' : '12%') }}>Status Layer</th>
+                                <th className="text-right px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif", width: type === 'doctors' ? '15%' : (isDoctor ? '20%' : '15%') }}>Terminal Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 Array(5).fill(0).map((_, i) => (
                                     <tr key={i}>
-                                        <td colSpan="6" className="px-6 py-6">
+                                        <td colSpan={colCount} className="px-6 py-6">
                                             <div className="animate-pulse h-6 rounded-lg w-full" style={{ background: 'var(--luna-navy)' }} />
                                         </td>
                                     </tr>
                                 ))
                             ) : filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" className="text-center py-24 font-medium italic" style={{ color: LUNA.steel }}>
-                                        <div className="flex flex-col items-center gap-3">
-                                            <Search className="w-8 h-8 opacity-20" />
-                                            <span>Zero database matches identified</span>
+                                    <td colSpan={colCount} className="text-center py-28" style={{ color: 'var(--luna-text-main)' }}>
+                                        <div className="flex flex-col items-center">
+                                            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-3 border border-white/5 opacity-20">
+                                                <Search className="w-6 h-6" />
+                                            </div>
+                                            <h3 className="text-sm font-bold tracking-[0.2em] opacity-40 uppercase mb-1">No Results Found</h3>
+                                            <p className="text-xs font-semibold opacity-30 max-w-[320px] leading-relaxed">
+                                                No matches found. Please try a different search term.
+                                            </p>
                                         </div>
                                     </td>
                                 </tr>
@@ -426,17 +457,16 @@ const ResourceList = ({ type, title, user }) => {
                                 const patientRiskColors = getRiskColors(item.risk_level);
                                 return (
                                     <tr key={i} className="group hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b last:border-0" style={{ borderColor: 'var(--luna-border)' }}>
-                                        <td className="pl-6 pr-4 py-4 align-middle">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-inner shrink-0 uppercase border"
-                                                    style={{ background: 'var(--luna-navy)', color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}>
-                                                    {(item.get_name && item.get_name !== " " ? item.get_name[0] : (item.first_name ? item.first_name[0] : '?'))}
+                                        <td className="px-4 py-4 align-middle">
+                                            <div className="flex items-center gap-4 cursor-pointer" onClick={() => setDetailsModal({ open: true, item: item })}>
+                                                <div className="w-10 h-10 rounded-lg flex items-center justify-center border shadow-inner shrink-0 transition-transform group-hover:scale-110"
+                                                    style={{ background: 'var(--luna-navy)', borderColor: 'var(--luna-border)' }}>
+                                                    {type === 'doctors' ? <Stethoscope className="w-4 h-4 opacity-40" /> : <User className="w-4 h-4 opacity-40" />}
                                                 </div>
                                                 <div className="text-left overflow-hidden">
-                                                    <p className="font-extrabold text-[14px] truncate" style={{ color: 'var(--luna-text-main)' }}>{item.get_name || item.patientName || 'Anonymous Identity'}</p>
-                                                    <div className="flex items-center gap-2 mt-0.5 opacity-60">
-                                                        {type === 'doctors' ? <Stethoscope className="w-3 h-3" /> : <User className="w-3 h-3" />}
-                                                        <p className="text-[10px] font-black uppercase tracking-widest truncate" style={{ color: 'var(--luna-text-muted)' }}>IDX-{String(item.id || i + 10).padStart(4, '0')} • {item.mobile || 'No Dial'}</p>
+                                                    <p className="font-extrabold text-[14px] truncate" style={{ color: 'var(--luna-text-main)' }}>{item.get_name || item.user?.first_name || 'Anonymous Identity'}</p>
+                                                    <div className="flex items-center gap-2 mt-0.5 opacity-40 uppercase tracking-widest text-[9px] font-bold">
+                                                        <span>IDX-{String(item.id || i).padStart(4, '0')} • {item.mobile || 'No Dial'}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -444,60 +474,61 @@ const ResourceList = ({ type, title, user }) => {
                                         
                                         {type === 'doctors' ? (
                                             <>
-                                                <td className="text-left px-4 py-4 align-middle">
-                                                    <span className="text-[11px] font-black uppercase tracking-wider block truncate" style={{ color: LUNA.steel }}>
+                                                <td className="px-4 py-4 align-middle hidden sm:table-cell">
+                                                    <span className="text-[11px] font-semibold px-3 py-1 rounded-lg border capitalize shadow-sm transition-all"
+                                                        style={{ background: 'var(--luna-navy)', borderColor: 'var(--luna-border)', color: 'var(--luna-text-main)' }}>
                                                         {item.department || 'General Assembly'}
                                                     </span>
-                                                    <span className="text-[9px] font-bold opacity-50 block mt-0.5" style={{ color: 'var(--luna-text-muted)' }}>{item.experience_years ? `${item.experience_years} Years Active` : 'Novice Protocol'}</span>
                                                 </td>
-                                                <td className="text-center px-4 py-4 align-middle">
-                                                    <span className="font-black text-[14px] whitespace-nowrap" style={{ color: 'var(--luna-text-main)' }}><span className="opacity-40 mr-1">₹</span>{parseFloat(item.consultation_fee || 0).toLocaleString()}</span>
+                                                <td className="text-center px-4 py-4 align-middle hidden md:table-cell">
+                                                    <p className="text-[13px] font-extrabold" style={{ color: 'var(--luna-text-main)' }}>{item.experience_years || 0} <span className="text-[9px] opacity-40 ml-0.5 uppercase">Yrs</span></p>
+                                                </td>
+                                                <td className="text-center px-4 py-4 align-middle hidden sm:table-cell">
+                                                    <span className="font-bold text-sm" style={{ color: 'var(--luna-text-main)' }}><span className="opacity-40 mr-1 text-[11px]">₹</span>{parseFloat(item.consultation_fee || 0).toLocaleString()}</span>
                                                 </td>
                                             </>
                                         ) : (
                                             <>
-                                                <td className="text-center px-2 py-4 align-middle">
+                                                <td className="text-center px-2 py-4 align-middle hidden sm:table-cell">
                                                     <span className="text-[11px] font-black px-2 py-1 rounded-md border text-red-500 bg-red-500/10 border-red-500/20 shadow-sm mx-auto flex items-center justify-center w-max gap-1">
                                                         <Droplets className="w-3 h-3"/> {item.blood_group || 'UNK'}
                                                     </span>
                                                 </td>
-                                                <td className="text-center px-2 py-4 align-middle">
+                                                <td className="text-center px-2 py-4 align-middle hidden sm:table-cell">
                                                     <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md border shadow-sm mx-auto inline-block whitespace-nowrap ${patientRiskColors.bg} ${patientRiskColors.text} ${patientRiskColors.border}`}>
                                                         {item.risk_level || 'LOW'}
                                                     </span>
                                                 </td>
-                                                <td className="text-left px-4 py-4 align-middle">
-                                                    <span className="text-[11px] font-bold block truncate" style={{ color: 'var(--luna-text-muted)' }}>
-                                                        {item.assigned_doctor_name ? `Dr. ${item.assigned_doctor_name}` : 'Unassigned Route'}
-                                                    </span>
-                                                </td>
+                                                {!isDoctor && (
+                                                    <td className="text-left px-4 py-4 align-middle hidden sm:table-cell">
+                                                        <span className="text-[11px] font-bold block truncate" style={{ color: 'var(--luna-text-muted)' }}>
+                                                            {item.assigned_doctor_name ? `Dr. ${item.assigned_doctor_name}` : 'Unassigned Route'}
+                                                        </span>
+                                                    </td>
+                                                )}
                                             </>
                                         )}
 
-                                        <td className="text-center px-4 py-4 align-middle">
-                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 font-black uppercase tracking-widest text-[9px] rounded-md border shadow-sm mx-auto whitespace-nowrap ${item.status ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-slate-500/10 text-slate-500 border-slate-500/20'}`}>
-                                                <div className={`w-1.5 h-1.5 rounded-full ${item.status ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`}/>
+                                        <td className="text-center px-4 py-4 align-middle hidden sm:table-cell">
+                                            <span className={`${item.status ? 'badge-success' : 'badge-slate'}`}
+                                                style={{ fontFamily: "'Inter', sans-serif", fontWeight: '700', letterSpacing: '0.05em', fontSize: '9px' }}>
                                                 {item.status ? 'Active' : (type === 'doctors' ? 'Suspended' : 'Discharged')}
                                             </span>
                                         </td>
                                         
-                                        <td className="text-center px-4 py-4 align-middle">
-                                            <div className="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity mx-auto w-max">
+                                        <td className="px-4 py-4 text-right align-middle">
+                                            <div className="flex items-center justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
                                                 {type === 'patients' && isDoctor && (
                                                     <button onClick={() => {
-                                                        const url = `/dashboard/appointments?patient_id=${item.id}&patient_name=${encodeURIComponent(item.get_name)}`;
-                                                        window.location.href = url; // Hard nav or navigate if using hook
+                                                        const url = `/dashboard/appointments?patient_id=${item.id}&patient_name=${encodeURIComponent(item.get_name || item.user?.first_name)}`;
+                                                        window.location.href = url;
                                                     }} title="Schedule Slot"
-                                                        className="p-1.5 rounded-lg border transition-all hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:-translate-y-0.5"
+                                                        className="px-3 py-1.5 rounded-lg border transition-all hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:-translate-y-0.5 text-[9px] font-black uppercase tracking-widest whitespace-nowrap"
                                                         style={{ color: '#10b981', background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                                                        <CalendarDays className="w-4 h-4" />
+                                                        Schedule Consult
                                                     </button>
                                                 )}
-                                                <button onClick={(e) => { e.stopPropagation(); setDetailsModal({ open: true, item }); }} title="Execute Analytics"
-                                                    className="p-1.5 rounded-lg border transition-all hover:bg-teal-500/10 hover:border-teal-500/30 hover:-translate-y-0.5"
-                                                    style={{ color: LUNA.teal, background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                                                    <FileText className="w-4 h-4" />
-                                                </button>
+
                                                 {canEdit && (
                                                     <button onClick={(e) => { e.stopPropagation(); setInputModal({ open: true, mode: 'edit', item }); }} title="Configure Override"
                                                         className="p-1.5 rounded-lg border transition-all hover:bg-blue-500/10 hover:border-blue-500/30 hover:-translate-y-0.5"

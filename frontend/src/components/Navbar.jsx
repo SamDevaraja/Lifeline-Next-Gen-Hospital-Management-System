@@ -16,6 +16,7 @@ const Navbar = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [langOpen, setLangOpen] = useState(false);
+    const [mobileLangOpen, setMobileLangOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const { theme, toggleTheme } = useTheme();
     const langRef = useRef(null);
@@ -25,6 +26,7 @@ const Navbar = () => {
         setIsLoggedIn(!!localStorage.getItem('token'));
         setIsMenuOpen(false);
         setLangOpen(false);
+        setMobileLangOpen(false);
     }, [location]);
 
     useEffect(() => {
@@ -76,9 +78,9 @@ const Navbar = () => {
             {/* Hidden Google Translate Target */}
             <div id="google_translate_element" style={{ display: 'none' }} />
 
-            <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div className="max-w-7xl mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
                 {/* Logo */}
-                <Link to="/" className="flex items-center gap-3 group">
+                <Link to={isLoggedIn ? "/dashboard" : "/home"} className="flex items-center gap-3 group">
                     <div className="p-0.5 rounded-2xl transition-all group-hover:scale-110"
                         style={{ background: 'rgba(46,196,182,0.03)' }}>
                         <img src={logo} alt="Lifeline Logo" className="w-11 h-11 object-contain drop-shadow-2xl" />
@@ -93,90 +95,83 @@ const Navbar = () => {
                     </div>
                 </Link>
 
-                {/* Mobile Toggle */}
-                <button className="md:hidden p-2 rounded-xl transition-all"
-                    style={{ color: LUNA.sky, background: isMenuOpen ? 'rgba(46,196,182,0.1)' : 'transparent' }}
-                    onClick={() => setIsMenuOpen(!isMenuOpen)}
-                    aria-label="Toggle menu">
-                    {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-                </button>
+                {/* Utility Controls - Mobile Only Theme Toggle */}
+                <div className="flex items-center gap-2">
+                    <button onClick={toggleTheme}
+                        className="md:hidden p-2.5 rounded-xl transition-all hover:bg-white/10"
+                        style={{ color: 'var(--luna-teal)' }}
+                        aria-label="Toggle theme">
+                        {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                    </button>
+
+                    {/* Mobile Toggle */}
+                    <button className="md:hidden p-2 rounded-xl transition-all"
+                        style={{ color: LUNA.sky, background: isMenuOpen ? 'rgba(46,196,182,0.1)' : 'transparent' }}
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                        aria-label="Toggle menu">
+                        {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                    </button>
+                </div>
 
                 {/* Desktop Nav */}
                 <div className="hidden md:flex items-center gap-6 text-sm font-semibold">
-                    <NavLink to="/" label={t('home')} />
-                    <NavLink to="/ai-assistant" label={t('aiAssistant')}
-                        icon={<BrainCircuit className="w-4 h-4" />} highlight />
+                    <NavLink to="/home" label={t('home')} />
                     <NavLink to="/about" label={t('about')} />
                     <NavLink to="/contact" label={t('contact')} />
                 </div>
 
                 {/* Right Side */}
                 <div className="hidden md:flex items-center gap-3">
-                    {/* Neural Language Switcher */}
-                    <div className="relative notranslate" ref={langRef} translate="no">
-                        <button id="lang-switcher-btn"
-                            className="flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.15em] transition-all border group"
-                            style={{
-                                color: 'var(--luna-teal)',
-                                background: langOpen ? 'rgba(56,189,248,0.1)' : 'transparent',
-                                borderColor: langOpen ? 'var(--luna-teal)' : 'var(--luna-border)',
-                                boxShadow: langOpen ? '0 0 20px rgba(56,189,248,0.2)' : 'none'
-                            }}
-                            onClick={() => setLangOpen(!langOpen)}
-                            aria-label="Switch language">
-                            <div className="flex items-center gap-2">
-                                <Globe className={`w-3.5 h-3.5 ${langOpen ? 'animate-spin-slow' : 'group-hover:rotate-12'} transition-transform`} />
-                                <span>{currentLang.label}</span>
-                                <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
-                                <span className="opacity-40 text-[8px] tracking-[0.3em]">Neural</span>
-                            </div>
-                            <ChevronDown className={`w-3 h-3 transition-transform duration-300 ${langOpen ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {langOpen && (
-                            <div className="absolute right-0 mt-3 w-56 rounded-2xl overflow-hidden z-50 animate-fade-in"
-                                style={{
-                                    background: 'var(--luna-card)',
-                                    border: '1px solid var(--luna-border)',
-                                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-                                    backdropFilter: 'blur(20px)'
-                                }}>
-                                <div className="px-4 py-2 text-[8px] font-black uppercase tracking-[0.3em] opacity-30 border-b border-white/5 bg-white/5">
-                                    Global Translation Hub
-                                </div>
-                                <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
-                                    {LANGUAGES.map(lang => (
-                                        <button key={lang.code} id={`lang-${lang.code}`}
-                                            className="w-full text-left px-5 py-3 text-xs font-bold flex items-center justify-between gap-2 transition-all group"
-                                            style={{
-                                                color: i18n.language === lang.code ? 'var(--luna-teal)' : 'var(--luna-text-muted)',
-                                                background: i18n.language === lang.code ? 'var(--luna-navy)' : 'transparent',
-                                            }}
-                                            onClick={() => switchLang(lang.code)}>
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-base grayscale group-hover:grayscale-0 transition-all">{lang.flag}</span>
-                                                <span className="tracking-wide">{lang.label}</span>
-                                            </div>
-                                            {i18n.language === lang.code && (
-                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                                <div className="p-3 bg-blue-500/5 text-[8px] font-bold text-center opacity-40 uppercase tracking-widest">
-                                    Powered by Lifeline Neural Engine
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Theme Toggle */}
+                    {/* Desktop Theme Toggle */}
                     <button onClick={toggleTheme}
                         className="p-2.5 rounded-xl transition-all hover:bg-white/10"
                         style={{ color: 'var(--luna-teal)' }}
                         aria-label="Toggle theme">
                         {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                     </button>
+                    {/* Language Switcher */}
+                    <div className="relative notranslate" ref={langRef} translate="no">
+                        <button id="lang-switcher-btn"
+                            className="flex items-center gap-2.5 px-4 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.22em] transition-all border shadow-sm group relative overflow-hidden"
+                            style={{
+                                color: 'var(--luna-teal)',
+                                background: langOpen ? 'rgba(56,189,248,0.15)' : 'var(--luna-glass)',
+                                borderColor: langOpen ? 'var(--luna-teal)' : 'rgba(56,189,248,0.2)',
+                                backdropFilter: 'blur(16px)',
+                                boxShadow: langOpen ? '0 0 25px rgba(56,189,248,0.15)' : 'none'
+                            }}
+                            onClick={() => setLangOpen(!langOpen)}
+                            aria-label="Switch language">
+                            <Globe className={`w-3.5 h-3.5 opacity-80 ${langOpen ? 'rotate-[360deg]' : 'group-hover:rotate-45'} transition-transform duration-700`} />
+                            <span className="translate-y-[0.5px]">{currentLang.label}</span>
+                            <div className="relative flex items-center justify-center">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)] animate-pulse" />
+                                <div className="absolute w-3 h-3 rounded-full border border-blue-500/20 animate-ping opacity-30" />
+                            </div>
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] opacity-60 ${langOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {langOpen && (
+                            <div className="absolute right-0 mt-3 w-64 rounded-[2rem] overflow-hidden z-20 animate-fade-in shadow-[0_20px_50px_rgba(0,0,0,0.3)] border" 
+                                style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)', backdropFilter: 'blur(30px)' }}>
+                                <div className="max-h-[380px] overflow-y-auto custom-scrollbar p-1.5">
+                                    {LANGUAGES.map(lang => (
+                                        <button key={lang.code} className="w-full text-left px-4 py-3 text-[13px] font-bold flex items-center justify-between gap-3 rounded-xl transition-all hover:bg-white/5 group/item"
+                                            style={{ color: i18n.language === lang.code ? 'var(--luna-teal)' : 'var(--luna-text-muted)' }}
+                                            onClick={() => switchLang(lang.code)}>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-lg transition-transform group-hover/item:scale-125">{lang.flag}</span>
+                                                <span className="tracking-tight">{lang.label}</span>
+                                            </div>
+                                            {i18n.language === lang.code && (
+                                                <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Auth Buttons */}
                     {isLoggedIn ? (
@@ -207,8 +202,7 @@ const Navbar = () => {
                     <div className="md:hidden p-4 space-y-1 animate-fade-in"
                         style={{ background: 'var(--luna-card)', borderTop: '1px solid var(--luna-border)' }}>
                         {[
-                            { to: '/', label: t('home') },
-                            { to: '/ai-assistant', label: t('aiAssistant') },
+                            { to: '/home', label: t('home') },
                             { to: '/about', label: t('about') },
                             { to: '/contact', label: t('contact') },
                         ].map(l => (
@@ -221,19 +215,42 @@ const Navbar = () => {
                             </Link>
                         ))}
                         <div className="pt-3 space-y-2 notranslate" style={{ borderTop: '1px solid rgba(167,235,242,0.1)' }} translate="no">
-                            <div className="flex flex-wrap gap-2 px-2 pb-2">
-                                {LANGUAGES.map(lang => (
-                                    <button key={lang.code}
-                                        className="px-3 py-1 rounded-xl text-xs font-bold transition-all"
-                                        style={{
-                                            background: i18n.language === lang.code ? 'var(--luna-navy)' : 'var(--luna-bg)',
-                                            color: i18n.language === lang.code ? 'var(--luna-teal)' : 'var(--luna-text-muted)',
-                                            border: i18n.language === lang.code ? '1px solid var(--luna-border)' : '1px solid transparent',
-                                        }}
-                                        onClick={() => switchLang(lang.code)}>
-                                        {lang.flag} {lang.code.toUpperCase()}
-                                    </button>
-                                ))}
+                            <div className="px-2 pb-2">
+                                <button
+                                    onClick={() => setMobileLangOpen(!mobileLangOpen)}
+                                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all border"
+                                    style={{
+                                        background: 'var(--luna-navy)',
+                                        color: 'var(--luna-teal)',
+                                        borderColor: mobileLangOpen ? 'var(--luna-teal)' : 'var(--luna-border)'
+                                    }}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Globe className="w-4 h-4" />
+                                        <span>{currentLang.label}</span>
+                                    </div>
+                                    <ChevronDown className={`w-4 h-4 transition-transform ${mobileLangOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                
+                                {mobileLangOpen && (
+                                    <div className="mt-2 space-y-1 pl-2">
+                                        {LANGUAGES.map(lang => (
+                                            <button key={lang.code}
+                                                className="w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between"
+                                                style={{
+                                                    color: i18n.language === lang.code ? 'var(--luna-teal)' : 'var(--luna-text-muted)',
+                                                    background: i18n.language === lang.code ? 'rgba(56,189,248,0.05)' : 'transparent',
+                                                }}
+                                                onClick={() => switchLang(lang.code)}>
+                                                <div className="flex items-center gap-2">
+                                                    <span>{lang.flag}</span>
+                                                    <span>{lang.label}</span>
+                                                </div>
+                                                {i18n.language === lang.code && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             {isLoggedIn ? (
                                 <Link to={JSON.parse(localStorage.getItem('lifeline-user') || '{}').role === 'patient' ? '/patient/dashboard' : '/dashboard'} 

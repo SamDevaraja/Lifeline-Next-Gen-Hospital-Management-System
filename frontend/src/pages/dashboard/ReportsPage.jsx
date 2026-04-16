@@ -2,13 +2,13 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Activity, Users, Calendar, Settings, LayoutDashboard,
-    ChevronRight, Search, Plus, HeartPulse, Sparkles, TrendingUp,
-    FileText, Bell, DollarSign, Stethoscope, BrainCircuit,
+    ChevronRight, Search, Plus, HeartPulse, TrendingUp,
+    FileText, Bell, DollarSign, Stethoscope,
     BarChart3, AlertCircle, CheckCircle, Clock, X, Menu,
     Video, Pill, FlaskConical, Smartphone, QrCode, User, Mic, ArrowRight, Sun, Moon, Globe, ChevronDown, Filter,
     Mail, Lock, BarChart as BarIcon, Target, Zap
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Line, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Line, AreaChart, Area, LineChart } from 'recharts';
 import api from '../../api/axios';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContext';
@@ -42,13 +42,16 @@ const ReportsPage = () => {
                 .sort((a, b) => parseInt(a.name.split(' ')[1]) - parseInt(b.name.split(' ')[1]))
                 .slice(-12);
 
-            // Revenue progression
-            const revByMonth = bills.data.reduce((acc, b) => {
-                const month = b.bill_date ? new Date(b.bill_date).toLocaleString('default', { month: 'short' }) : 'N/A';
-                acc[month] = (acc[month] || 0) + parseFloat(b.total_amount || 0);
+            // Revenue progression by day
+            const revByDay = bills.data.reduce((acc, b) => {
+                const day = b.bill_date ? b.bill_date.split('-').slice(1).join('/') : 'N/A';
+                acc[day] = (acc[day] || 0) + parseFloat(b.total_amount || 0);
                 return acc;
             }, {});
-            const revChartData = Object.entries(revByMonth).map(([month, revenue]) => ({ month, revenue }));
+            const revChartData = Object.entries(revByDay)
+                .map(([day, revenue]) => ({ day, revenue }))
+                .sort((a, b) => a.day.localeCompare(b.day))
+                .slice(-15); // Show last 15 active days
 
             // Dept distribution
             const deptMap = doctors.data.reduce((acc, d) => {
@@ -78,7 +81,7 @@ const ReportsPage = () => {
             setLastUpdated(new Date());
         } catch (e) {
             console.error("Analytics failure", e);
-            toast.error("Intelligence synchronization failed.");
+            toast.error("Analytics synchronization failed.");
         } finally {
             setLoading(false);
         }
@@ -106,102 +109,89 @@ const ReportsPage = () => {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
             <Toaster position="top-right" />
             
-            {/* Museum Clean Header */}
+            {/* Institutional Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-extrabold" style={{ color: 'var(--luna-text-main)' }}>Clinical Analytics</h1>
-                    <p className="text-sm font-medium mt-1" style={{ color: 'var(--luna-text-muted)' }}>
-                        Institutional Intelligence Hub • Operational Performance 
-                    </p>
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center border shadow-sm bg-[var(--luna-card)]"
+                        style={{ borderColor: 'var(--luna-border)' }}>
+                        <BarIcon className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Clinical Analytics</h1>
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mt-0.5" style={{ color: 'var(--luna-text-muted)' }}>
+                            Institutional Performance Hub • Audit Ready
+                        </p>
+                    </div>
                 </div>
                 <div className="flex items-center gap-3">
                     {lastUpdated && (
-                        <div className="flex items-center gap-2.5 px-4 py-2 rounded-2xl border text-[10px] font-black uppercase tracking-widest shadow-sm" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)', color: 'var(--luna-text-muted)' }}>
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <div className="px-4 py-2 rounded-xl border bg-[var(--luna-card)] shadow-sm text-[10px] font-black uppercase tracking-widest" style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-muted)' }}>
                             Live Sync: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                     )}
                     <button onClick={fetchReports} 
-                        className="btn-primary text-[10px] font-black uppercase tracking-widest px-6 h-[46px] shadow-xl flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4" /> Refresh Hub
+                        className="px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-white shadow-sm hover:bg-blue-700 transition-all bg-blue-600 flex items-center gap-2">
+                        <TrendingUp className="w-3.5 h-3.5" /> Refresh Hub
                     </button>
                 </div>
             </div>
 
-            {/* KPI Matrix - Museum Clean Edition */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Pulse Grid KPIs */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {loading ? Array(4).fill(0).map((_, i) => (
-                    <div key={i} className="animate-pulse h-28 rounded-2xl" style={{ background: 'var(--luna-navy)' }} />
+                    <div key={i} className="animate-pulse h-20 rounded-xl" style={{ background: 'var(--luna-card)' }} />
                 )) : kpiCards.map((s, i) => (
-                    <div key={i} className="card p-6 flex items-center gap-5 border shadow-sm"
-                        style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black border shadow-inner shrink-0"
-                            style={{ background: 'var(--luna-navy)', color: s.color, borderColor: 'var(--luna-border)' }}>
-                            {s.icon}
-                        </div>
-                        <div className="flex flex-col justify-center">
-                            <p className="text-[12px] font-extrabold uppercase opacity-40 mb-1" style={{ color: 'var(--luna-text-main)' }}>{s.label}</p>
-                            <h3 className="text-3xl font-black tracking-tighter leading-none" style={{ color: 'var(--luna-text-main)' }}>{s.value}</h3>
-                        </div>
+                    <div key={i} className="p-4 border rounded-xl shadow-sm bg-[var(--luna-card)]" style={{ borderColor: 'var(--luna-border)' }}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-1" style={{ fontFamily: "'Inter', sans-serif" }}>{s.label}</p>
+                        <p className="text-2xl font-extrabold" style={{ color: s.color, fontFamily: "'Inter', sans-serif" }}>{s.value}</p>
                     </div>
                 ))}
             </div>
 
-            {/* Global Intelligence Grids */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Global Operational Grids */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 
                 {/* Revenue Momentum Chart */}
-                <div className="card p-10 border rounded-[2.5rem] shadow-sm" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                    <div className="flex items-center justify-between mb-10">
+                <div className="p-6 border rounded-xl shadow-sm bg-[var(--luna-card)]" style={{ borderColor: 'var(--luna-border)' }}>
+                    <div className="flex items-center justify-between mb-8">
                         <div>
-                            <h2 className="text-lg font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Revenue Momentum</h2>
-                            <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mt-1">Financial Progression Analysis</p>
-                        </div>
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center border" style={{ background: 'var(--luna-navy)', borderColor: 'var(--luna-border)' }}>
-                            <BarIcon className="w-4 h-4 text-emerald-500" />
+                            <h2 className="text-base font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Revenue Momentum</h2>
+                            <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mt-0.5">Financial Progression Analysis</p>
                         </div>
                     </div>
                     {!loading && data && (
-                        <div className="h-[280px] w-full">
+                        <div className="h-[250px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={data.revChartData} margin={{ left: -20, right: 0 }}>
-                                    <defs>
-                                        <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="var(--luna-blue)" stopOpacity={0.15}/>
-                                            <stop offset="95%" stopColor="var(--luna-blue)" stopOpacity={0}/>
-                                        </linearGradient>
-                                    </defs>
+                                <LineChart data={data.revChartData} margin={{ left: -20, right: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="var(--luna-border)" vertical={false} />
-                                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--luna-text-muted)' }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--luna-text-muted)' }} tickFormatter={v => `₹${(v/1000)}k`} />
-                                    <Tooltip contentStyle={{ borderRadius: '16px', border: '1px solid var(--luna-border)', background: 'var(--luna-card)', fontWeight: 800, fontSize: '11px' }} />
-                                    <Area type="monotone" dataKey="revenue" stroke="var(--luna-blue)" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
-                                </AreaChart>
+                                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 900, fill: 'var(--luna-text-muted)' }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 900, fill: 'var(--luna-text-muted)' }} tickFormatter={v => `₹${(v/1000)}k`} />
+                                    <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid var(--luna-border)', background: 'var(--luna-card)', fontWeight: 900, fontSize: '10px' }} />
+                                    <Line type="monotone" dataKey="revenue" stroke="var(--luna-blue)" strokeWidth={3} dot={{ r: 4, fill: 'var(--luna-blue)', strokeWidth: 2, stroke: 'var(--luna-card)' }} activeDot={{ r: 6 }} />
+                                </LineChart>
                             </ResponsiveContainer>
                         </div>
                     )}
                 </div>
 
+
                 {/* Appointment Load Analysis */}
-                <div className="card p-10 border rounded-[2.5rem] shadow-sm" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                    <div className="flex items-center justify-between mb-10">
+                <div className="p-6 border rounded-xl shadow-sm bg-[var(--luna-card)]" style={{ borderColor: 'var(--luna-border)' }}>
+                    <div className="flex items-center justify-between mb-8">
                         <div>
-                            <h2 className="text-lg font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Patient Flow</h2>
-                            <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mt-1">Daily Appointment Distribution</p>
-                        </div>
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center border" style={{ background: 'var(--luna-navy)', borderColor: 'var(--luna-border)' }}>
-                            <Zap className="w-4 h-4 text-blue-500" />
+                            <h2 className="text-base font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Patient Flow</h2>
+                            <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mt-0.5">Daily Appointment Distribution</p>
                         </div>
                     </div>
                     {!loading && data && (
-                        <div className="h-[280px] w-full">
+                        <div className="h-[250px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={data.appChartData} margin={{ left: -20, right: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="var(--luna-border)" vertical={false} />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--luna-text-muted)' }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: 'var(--luna-text-muted)' }} />
-                                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ borderRadius: '16px', border: '1px solid var(--luna-border)', background: 'var(--luna-card)', fontWeight: 800, fontSize: '11px' }} />
-                                    <Bar dataKey="count" fill="var(--luna-teal)" radius={[4, 4, 0, 0]} barSize={12} />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 900, fill: 'var(--luna-text-muted)' }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 900, fill: 'var(--luna-text-muted)' }} />
+                                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ borderRadius: '12px', border: '1px solid var(--luna-border)', background: 'var(--luna-card)', fontWeight: 900, fontSize: '10px' }} />
+                                    <Bar dataKey="count" fill="var(--luna-teal)" radius={[3, 3, 0, 0]} barSize={14} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -209,31 +199,27 @@ const ReportsPage = () => {
                 </div>
 
                 {/* Triage Status Map */}
-                <div className="card p-10 border rounded-[2.5rem] shadow-sm" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                    <div className="flex items-center justify-between mb-10">
-                        <div>
-                            <h2 className="text-lg font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Triage Outcomes</h2>
-                            <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mt-1">Clinical Success vs Delay Rates</p>
-                        </div>
+                <div className="p-6 border rounded-xl shadow-sm bg-[var(--luna-card)]" style={{ borderColor: 'var(--luna-border)' }}>
+                    <div className="mb-8">
+                        <h2 className="text-base font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Triage Outcomes</h2>
+                        <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mt-0.5">Clinical Success vs Delay Rates</p>
                     </div>
                     {!loading && data && (
-                        <div className="space-y-6">
+                        <div className="space-y-5">
                             {data.statusData.map((s, idx) => {
                                 const total = data.statusData.reduce((a, b) => a + b.value, 0);
                                 const pct = Math.round((s.value / total) * 100);
                                 const color = PIE_COLORS[idx % PIE_COLORS.length];
                                 return (
-                                    <div key={idx} className="space-y-2">
+                                    <div key={idx} className="space-y-1.5">
                                         <div className="flex items-center justify-between px-1">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-2 h-2 rounded-full" style={{ background: color }} />
-                                                <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: 'var(--luna-text-main)' }}>{s.name}</span>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+                                                <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--luna-text-main)' }}>{s.name}</span>
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-[14px] font-black" style={{ color }}>{pct}%</span>
-                                            </div>
+                                            <span className="text-[12px] font-black" style={{ color }}>{pct}%</span>
                                         </div>
-                                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--luna-navy)' }}>
+                                        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--luna-navy)' }}>
                                             <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1 }} className="h-full rounded-full" style={{ background: color }} />
                                         </div>
                                     </div>
@@ -244,35 +230,33 @@ const ReportsPage = () => {
                 </div>
 
                 {/* Resource Allocation Map */}
-                <div className="card p-10 border rounded-[2.5rem] shadow-sm" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                    <div className="flex items-center justify-between mb-10">
-                        <div>
-                            <h2 className="text-lg font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Medical Resources</h2>
-                            <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mt-1">Staff Specialization Density</p>
-                        </div>
+                <div className="p-6 border rounded-xl shadow-sm bg-[var(--luna-card)]" style={{ borderColor: 'var(--luna-border)' }}>
+                    <div className="mb-8">
+                        <h2 className="text-base font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Staff Specialization</h2>
+                        <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mt-0.5">Medical Resource Density</p>
                     </div>
                     {!loading && data && (
-                        <div className="flex flex-col md:flex-row items-center gap-10">
-                            <div className="relative w-48 h-48">
+                        <div className="flex flex-col md:flex-row items-center gap-8">
+                            <div className="relative w-40 h-40">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={data.deptData} innerRadius={60} outerRadius={84} paddingAngle={4} dataKey="value" stroke="transparent">
+                                        <Pie data={data.deptData} innerRadius={50} outerRadius={70} paddingAngle={4} dataKey="value" stroke="transparent">
                                             {data.deptData.map((_, idx) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}
                                         </Pie>
                                     </PieChart>
                                 </ResponsiveContainer>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-2xl font-black" style={{ color: 'var(--luna-text-main)' }}>{data.kpis.totalDoctors}</span>
-                                    <span className="text-[8px] font-black uppercase opacity-40">Staff Units</span>
+                                    <span className="text-xl font-black" style={{ color: 'var(--luna-text-main)' }}>{data.kpis.totalDoctors}</span>
+                                    <span className="text-[7px] font-black uppercase opacity-40">Specialists</span>
                                 </div>
                             </div>
-                            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {data.deptData.map((d, idx) => (
-                                    <div key={idx} className="flex items-center gap-3">
+                                    <div key={idx} className="flex items-center gap-2">
                                         <div className="w-1.5 h-1.5 rounded-full" style={{ background: PIE_COLORS[idx % PIE_COLORS.length] }} />
                                         <div className="flex flex-col">
-                                            <span className="text-[10px] font-black uppercase tracking-wider opacity-60" style={{ color: 'var(--luna-text-main)' }}>{d.name}</span>
-                                            <span className="text-xs font-black" style={{ color: 'var(--luna-text-main)' }}>{d.value} Specialists</span>
+                                            <span className="text-[9px] font-black uppercase tracking-wider opacity-60" style={{ color: 'var(--luna-text-main)' }}>{d.name}</span>
+                                            <span className="text-xs font-bold" style={{ color: 'var(--luna-text-main)' }}>{d.value}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -285,5 +269,6 @@ const ReportsPage = () => {
         </motion.div>
     );
 };
+
 
 export default ReportsPage;

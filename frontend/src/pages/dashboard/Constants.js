@@ -1,6 +1,6 @@
 export const LUNA = {
-    sky: 'var(--luna-teal)',
-    teal: 'var(--luna-blue)',
+    sky: 'var(--luna-primary)',
+    teal: 'var(--luna-primary)',
     steel: 'var(--luna-steel)',
     navy: 'var(--luna-navy)',
     dark: 'var(--luna-bg)',

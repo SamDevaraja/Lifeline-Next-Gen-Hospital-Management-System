@@ -125,7 +125,7 @@ const InputModal = ({ isOpen, title, fields, onConfirm, onCancel }) => {
                     <button onClick={onCancel} className="px-6 py-3 rounded-2xl font-black text-[12px] uppercase tracking-widest transition-all hover:bg-black/5" style={{ color: 'var(--luna-text-main)' }}>
                         Cancel
                     </button>
-                    <button onClick={() => onConfirm(values)} className="px-8 py-3.5 rounded-2xl font-black text-[12px] uppercase tracking-widest text-white transition-all bg-blue-600 hover:bg-blue-500 shadow-xl shadow-blue-500/20 active:scale-95">
+                    <button onClick={() => onConfirm(values)} className="px-8 py-3.5 rounded-2xl font-black text-[12px] uppercase tracking-widest text-white transition-all bg-primary hover:bg-primary-hover shadow-xl shadow-primary/20 active:scale-95">
                         Commit Changes
                     </button>
                 </div>

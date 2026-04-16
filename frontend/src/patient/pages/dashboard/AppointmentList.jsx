@@ -32,14 +32,23 @@ const AppointmentList = ({ user }) => {
     const [linkModal, setLinkModal] = useState({ open: false, appt: null });
     const [newApptModal, setNewApptModal] = useState({ open: false });
     const [detailsModal, setDetailsModal] = useState({ open: false, item: null });
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const filterRef = useRef(null);
+
+    // Outside click management for Clinical Dropdown
+    useEffect(() => {
+        const handler = (e) => { if (filterRef.current && !filterRef.current.contains(e.target)) setIsFilterOpen(false); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     const fetchAppointments = async () => {
         setLoading(true);
         try {
             let apptUrl = 'appointments/';
             let params = new URLSearchParams();
-            if (user?.role === 'doctor') params.append('doctor_id', user.id);
-            if (user?.role === 'patient') params.append('patient_id', user.id);
+            if (user?.role === 'doctor') params.append('doctor_id', user.doctor_id);
+            if (user?.role === 'patient') params.append('patient_id', user.patient_id);
             const query = params.toString();
             if (query) apptUrl += `?${query}`;
 
@@ -142,7 +151,7 @@ const AppointmentList = ({ user }) => {
                 onConfirm={(vals) => {
                     const { date, time, doctor } = vals;
                     if (!date || !time || !doctor) return;
-                    api.post('appointments/', { appointment_date: date, appointment_time: time, status: 'pending', patient: user.id, doctor })
+                    api.post('appointments/', { appointment_date: date, appointment_time: time, status: 'pending', patient: user.patient_id, doctor })
                         .then(() => {
                             toast.success("Appointment scheduled.");
                             setNewApptModal({ open: false });
@@ -152,89 +161,165 @@ const AppointmentList = ({ user }) => {
                 }}
                 onCancel={() => setNewApptModal({ open: false })}
             />
-            {/* SCHEDULING HEADER */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-6 mb-6" style={{ borderColor: 'var(--luna-border)' }}>
+            {/* 🏥 CLINICAL TERMINAL HEADER */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between px-2 gap-6 mb-8">
                 <div>
-                    <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>
-                        <Calendar className="w-6 h-6 inline mr-2 text-indigo-500" /> Consultations & Schedule
-                    </h1>
-                    <p className="text-xs font-bold mt-1" style={{ color: 'var(--luna-text-dim)' }}>Manage your appointments and virtual meetings.</p>
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center border shadow-sm" style={{ background: 'var(--luna-info-bg)', borderColor: 'var(--luna-border)' }}>
+                            <Calendar className="w-5 h-5 text-[var(--luna-teal)]" />
+                        </div>
+                        <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Consultations & Schedule</h1>
+                    </div>
+                    <p className="text-xs font-bold opacity-40 ml-13" style={{ color: 'var(--luna-text-main)' }}>Managing active clinical appointments and telemedicine sessions.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => setNewApptModal({ open: true })}
-                        className="bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm transition-all flex items-center gap-2"
+                        className="btn-teal !px-6 !py-2.5 !text-[11px] h-10 shadow-indigo-500/20"
                     >
-                        <Plus className="w-4 h-4" /> Schedule Visit
+                        <Plus className="w-4 h-4" /> Schedule Specialist Visit
                     </button>
-                    <div className="relative group">
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="border rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-widest outline-none cursor-pointer transition-all appearance-none pr-8 shadow-sm"
-                            style={{ background: 'var(--luna-card)', color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}
-                        >
-                            {['pending', 'confirmed', 'completed', 'cancelled', 'all'].map(f => (
-                                <option key={f} value={f} style={{ background: 'var(--luna-card)', color: 'var(--luna-text-main)' }}>{f} status</option>
-                            ))}
-                        </select>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors" style={{ color: 'var(--luna-text-muted)' }}>
-                            <Filter className="w-3.5 h-3.5" />
-                        </div>
-                    </div>
                 </div>
             </div>
 
+            {/* 🧪 STATUS TERMINAL - EXECUTIVE DROPDOWN */}
+            <div className="flex items-center justify-start mb-8">
+                <div className="relative" ref={filterRef}>
+                    <button
+                        onClick={() => setIsFilterOpen(!isFilterOpen)}
+                        className="flex items-center gap-3 px-5 py-2.5 rounded-2xl border transition-all hover:bg-white/[0.03] group"
+                        style={{ background: 'var(--luna-navy)', borderColor: 'var(--luna-border)' }}
+                    >
+                        <Filter className="w-3.5 h-3.5 text-[var(--luna-teal)] opacity-60" />
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: 'var(--luna-text-main)' }}>
+                                Filter: {statusFilter.toUpperCase()}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded-md text-[8px] bg-[var(--luna-teal)] text-white font-black">
+                                {statusFilter === 'all' ? allAppointments.length : allAppointments.filter(a => a.status === statusFilter).length}
+                            </span>
+                        </div>
+                        <ChevronDown className={`w-3.5 h-3.5 opacity-30 transition-transform duration-300 ${isFilterOpen ? 'rotate-180' : ''}`} />
+                    </button>
 
+                    <AnimatePresence>
+                        {isFilterOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 4, scale: 1 }}
+                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                className="absolute left-0 mt-2 w-56 rounded-2xl border shadow-2xl z-50 overflow-hidden"
+                                style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)', backdropFilter: 'blur(20px)' }}
+                            >
+                                <div className="p-2 space-y-1">
+                                    {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map(f => {
+                                        const count = f === 'all' ? allAppointments.length : allAppointments.filter(a => a.status === f).length;
+                                        const active = statusFilter === f;
+                                        return (
+                                            <button
+                                                key={f}
+                                                onClick={() => {
+                                                    setStatusFilter(f);
+                                                    setIsFilterOpen(false);
+                                                }}
+                                                className={`w-full text-left px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-between transition-all
+                                                    ${active ? 'bg-[var(--luna-navy)] text-[var(--luna-teal)]' : 'hover:bg-white/5 opacity-50 hover:opacity-100'}`}
+                                            >
+                                                <span>{f}</span>
+                                                <span className={`px-1.5 py-0.5 rounded-md text-[8px] border ${active ? 'bg-[var(--luna-teal)] text-white border-transparent' : 'bg-white/5 border-white/5'}`}>
+                                                    {count}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
 
-            <div className="card overflow-hidden p-0 shadow-sm border" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
+            {/* 📑 CLINICAL LEDGER */}
+            <div className="card-clinical !p-0 shadow-2xl border-white/5 bg-white/[0.01]">
                 <table className="table-clinical">
-                    <thead>
+                    <thead className="bg-[var(--luna-navy)] border-b" style={{ borderColor: 'var(--luna-border)' }}>
                         <tr>
-                            <th>Patient</th>
-                            <th>Doctor</th>
-                            <th>Date & Time</th>
-                            <th>Status</th>
-                            {user?.role !== 'admin' && <th>Meeting Link</th>}
-                            <th>Actions</th>
+                            <th className="!text-[10px] !py-5"><div className="flex items-center gap-2"><Users className="w-3.5 h-3.5 opacity-40" /> Patient</div></th>
+                            <th className="!text-[10px]"><div className="flex items-center gap-2"><Stethoscope className="w-3.5 h-3.5 opacity-40" /> Specialist</div></th>
+                            <th className="!text-[10px]"><div className="flex items-center gap-2"><Calendar className="w-3.5 h-3.5 opacity-40" /> Schedule</div></th>
+                            <th className="!text-[10px]">Status</th>
+                            {user?.role !== 'admin' && <th className="!text-[10px]">Consultation Bridge</th>}
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-white/5">
                         {loading ? (
                             Array(4).fill(0).map((_, i) => (
-                                <tr key={i}><td colSpan={user?.role === 'admin' ? 5 : 6} className="px-6 py-4"><div className="animate-shimmer h-4 rounded w-full" /></td></tr>
+                                <tr key={i}><td colSpan={user?.role === 'admin' ? 4 : 5} className="px-6 py-8"><div className="animate-pulse h-4 bg-white/5 rounded w-full" /></td></tr>
                             ))
                         ) : filteredData.length === 0 ? (
-                            <tr><td colSpan={user?.role === 'admin' ? 5 : 6} className="text-center py-24 text-gray-400 italic font-medium tracking-wide">No appointments found in this clinical state.</td></tr>
+                            <tr>
+                                <td colSpan={user?.role === 'admin' ? 4 : 5} className="py-32">
+                                    <div className="flex flex-col items-center justify-center opacity-30">
+                                        <AlertCircle className="w-12 h-12 mb-4" />
+                                        <p className="text-sm font-black uppercase tracking-widest">No clinical sessions found</p>
+                                        <p className="text-[10px] font-bold mt-1">Adjust your status filter or schedule a new visit via the terminal.</p>
+                                    </div>
+                                </td>
+                            </tr>
                         ) : filteredData.map((a, i) => (
-                            <tr key={a.id || i}>
+                            <tr key={a.id || i} className="group hover:bg-white/[0.02] transition-all">
                                 <td>
                                     <div className="flex items-center gap-3">
-                                        <div className="avatar w-8 h-8 text-[10px]">{a.patientName?.[0] || 'P'}</div>
-                                        <span className="font-bold text-sm" style={{ color: 'var(--luna-text-main)' }}>{a.patientName}</span>
+                                        <div className="w-9 h-9 avatar shadow-xl ring-2 ring-white/5 group-hover:ring-[var(--luna-teal)]/30 transition-all font-black text-xs">
+                                            {a.patientName?.[0] || 'P'}
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="font-black text-[13px] tracking-tight" style={{ color: 'var(--luna-text-main)' }}>{a.patientName}</span>
+                                            <span className="text-[9px] font-bold opacity-30 uppercase tracking-tighter">Registration: CID-2024</span>
+                                        </div>
                                     </div>
                                 </td>
-                                <td><span className="text-sm font-semibold" style={{ color: 'var(--luna-text-muted)' }}>{a.doctorName}</span></td>
                                 <td>
                                     <div className="flex flex-col">
-                                        <span className="text-sm font-bold" style={{ color: 'var(--luna-text-main)' }}>{a.appointment_date}</span>
-                                        <span className="text-[10px] font-bold" style={{ color: 'var(--luna-text-muted)' }}>{a.appointment_time || 'No Time'}</span>
+                                        <span className="text-[13px] font-black" style={{ color: 'var(--luna-text-main)' }}>Dr. {a.doctorName}</span>
+                                        <span className="text-[9px] font-bold opacity-30 uppercase tracking-widest">Specialist Unit</span>
                                     </div>
                                 </td>
-                                <td><span className={a.status === 'confirmed' || a.status === 'completed' ? 'badge-success' : 'badge-warn'} style={{ display: 'inline-flex' }}>{a.status.toUpperCase()}</span></td>
+                                <td>
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="w-3 h-3 text-[var(--luna-teal)] opacity-60" />
+                                            <span className="text-[12px] font-black" style={{ color: 'var(--luna-text-main)' }}>{a.appointment_date}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <Clock className="w-3 h-3 text-[var(--luna-teal)] opacity-60" />
+                                            <span className="text-[10px] font-black opacity-40">{a.appointment_time || 'No Time'}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div className="flex">
+                                        <span className={a.status === 'confirmed' || a.status === 'completed' ? 'badge-success' : a.status === 'cancelled' ? 'badge-danger' : 'badge-warn'}>
+                                            {a.status}
+                                        </span>
+                                    </div>
+                                </td>
                                 {user?.role !== 'admin' && (
                                     <td>
                                         {user?.role === 'patient' && (
-                                            <div className="flex flex-col gap-2">
+                                            <div className="flex items-center gap-3">
                                                 {a.meeting_link ? (
                                                     <button
                                                         onClick={() => window.open(a.meeting_link, '_blank')}
-                                                        className="text-xs font-bold px-3 py-1.5 rounded-lg bg-teal-500 text-white flex items-center gap-1 shadow-md hover:bg-teal-600 w-fit"
+                                                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--luna-info-bg)] border border-[var(--luna-teal)] text-[var(--luna-teal)] text-[10px] font-black uppercase tracking-wider hover:bg-[var(--luna-teal)] hover:text-white transition-all shadow-lg shadow-blue-500/10"
                                                     >
-                                                        <Video className="w-3 h-3" /> Join Call
+                                                        <Video className="w-3.5 h-3.5" /> Initialize Bridge
                                                     </button>
                                                 ) : (
-                                                    <span className="text-[10px] font-bold text-slate-400 italic bg-slate-100 px-3 py-1.5 rounded-lg flex items-center w-fit border border-teal-500/10">Waiting for link...</span>
+                                                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/5 opacity-40">
+                                                        <Clock className="w-3 h-3" />
+                                                        <span className="text-[9px] font-black uppercase tracking-widest">Awaiting Bridge</span>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
@@ -242,27 +327,13 @@ const AppointmentList = ({ user }) => {
                                         {user?.role === 'doctor' && (
                                             <button
                                                 onClick={() => setLinkModal({ open: true, appt: a })}
-                                                className="text-xs font-bold px-3 py-1.5 rounded-lg border border-teal-500/20 text-teal-600 hover:bg-teal-50 transition-all w-fit"
+                                                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-wider hover:bg-white/10 transition-all"
                                             >
-                                                {a.meeting_link ? 'Edit Meet Link' : 'Attach Meet Link'}
+                                                <Video className="w-3.5 h-3.5" /> Configure Bridge
                                             </button>
                                         )}
                                     </td>
                                 )}
-                                <td>
-                                    <div className="flex flex-wrap gap-2">
-                                        <button
-                                            onClick={() => setDetailsModal({ open: true, item: a })}
-                                            className="text-xs font-bold px-3 py-1.5 rounded-lg transition-colors hover:bg-teal-100"
-                                            style={{ color: LUNA.teal, background: 'rgba(46,196,182,0.08)' }}>Details</button>
-                                        {(a.status === 'pending' || a.status === 'confirmed') && (
-                                            <button
-                                                onClick={() => setConfirmCancel({ open: true, id: a.id })}
-                                                className="text-xs font-bold px-3 py-1.5 rounded-lg transition-colors hover:bg-red-100"
-                                                style={{ color: '#ef4444', background: 'rgba(239,68,68,0.06)' }}>Cancel</button>
-                                        )}
-                                    </div>
-                                </td>
                             </tr>
                         ))}
                     </tbody>

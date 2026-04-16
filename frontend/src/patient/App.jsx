@@ -1,5 +1,6 @@
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import About from './pages/About';
@@ -19,7 +20,7 @@ const AppContent = () => {
       {!isDashboard && <Navbar />}
       <Routes>
         <Route path="/" element={<Navigate to="/" replace />} />
-        <Route path="/login" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/about" element={<Navigate to="/about" replace />} />
         <Route path="/contact" element={<Navigate to="/contact" replace />} />
         <Route path="/signup" element={<Signup />} />

@@ -18,6 +18,7 @@ router.register(r'lab-tests', api.LabTestViewSet, basename='lab-tests')
 router.register(r'prescriptions', api.PrescriptionViewSet, basename='prescriptions')
 router.register(r'pharmacy-orders', api.PharmacyOrderViewSet, basename='pharmacy-orders')
 router.register(r'staff', api.StaffViewSet, basename='staff')
+router.register(r'support-messages', api.SupportMessageViewSet, basename='support-messages')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -43,6 +44,10 @@ urlpatterns = [
 
     # Current user info
     path('api/me/', api.me, name='me'),
+
+    # Search
+    path('api/search/patient/', api.patient_search, name='patient_search'),
+    path('api/search/staff/', api.staff_search, name='staff_search'),
 
     # All API routes
     path('api/', include(router.urls)),

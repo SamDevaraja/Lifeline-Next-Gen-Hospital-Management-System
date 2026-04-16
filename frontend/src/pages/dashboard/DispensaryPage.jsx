@@ -125,19 +125,22 @@ const DispensaryPage = ({ user }) => {
             const { data } = await api.post('pharmacy-orders/process_order/', payload);
             toast.success('Transaction Completed!', { id: 'txn' });
             
+            // Try to open bill PDF
             try {
                 const pdfResponse = await api.get(`bills/${data.bill_id}/generate_pdf/`, { responseType: 'blob' });
                 const blob = new Blob([pdfResponse.data], { type: 'application/pdf' });
                 const url = window.URL.createObjectURL(blob);
                 window.open(url, '_blank');
             } catch (pdfErr) {
-                toast.error('Failed to generate PDF automatically.');
+                console.warn('PDF auto-open blocked or failed', pdfErr);
             }
             
-            setCart([]); setSelectedPatientId(''); setRelatedRxId(null);
+            setCart([]); setSelectedPatientId(''); setRelatedRxId(null); setSearchTermPatient('');
             setGuestName(''); setGuestMobile('');
             fetchData(true);
-        } catch (e) { toast.error(e.response?.data?.error || 'Transaction failed.', { id: 'txn' }); }
+        } catch (e) { 
+            toast.error(e.response?.data?.error || 'Transaction failed.', { id: 'txn' }); 
+        }
     };
 
     const cardStyle = { background: 'var(--luna-card)', border: '1px solid var(--luna-border)' };
@@ -150,8 +153,48 @@ const DispensaryPage = ({ user }) => {
         <div className="flex flex-col h-[calc(100vh-140px)] gap-6 antialiased">
             {/* MAIN WORKSPACE */}
             <div className="flex-1 flex gap-6 overflow-hidden min-h-0">
+                
+                {/* 1. PRESCRIPTION QUEUE (Active Inbound Feed) */}
+                <div className="w-[340px] flex flex-col rounded-2xl border shadow-sm overflow-hidden" style={cardStyle}>
+                    <header className="p-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-navy)' }}>
+                        <div className="flex items-center gap-3">
+                            <ClipboardList className="w-4 h-4 text-emerald-500" />
+                            <h2 className="text-[11px] font-black uppercase tracking-widest text-slate-100">Prescription Queue</h2>
+                        </div>
+                        <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">{pendingRx.length} LIVE</span>
+                    </header>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3" style={{ background: 'var(--luna-card)' }}>
+                        {pendingRx.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center p-6 text-center" style={{ color: 'var(--luna-text-main)' }}>
+                                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-3 border border-white/5 opacity-20">
+                                    <Search className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-sm font-bold tracking-[0.2em] opacity-40 uppercase mb-1">Queue Depleted</h3>
+                                <p className="text-[10px] font-semibold opacity-30 max-w-[200px] leading-relaxed">
+                                    No active prescriptions currently require fulfillment.
+                                </p>
+                            </div>
+                        ) : (
+                            pendingRx.map(p => (
+                                <button key={p.id} onClick={() => stageRx(p)}
+                                    className={`w-full text-left p-4 rounded-2xl border transition-all group ${relatedRxId === p.id ? 'ring-2 ring-emerald-500' : 'hover:bg-white/5'}`}
+                                    style={{ background: 'var(--luna-background-secondary)', borderColor: 'var(--luna-border)' }}>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500"><User className="w-3.5 h-3.5" /></div>
+                                        <div className="text-[8px] font-black uppercase opacity-40">{p.created_at?.split('T')[1].slice(0,5)}</div>
+                                    </div>
+                                    <p className="text-[12px] font-black uppercase tracking-tight" style={textMain}>{p.patient_name}</p>
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <Pill className="w-3 h-3 opacity-30" />
+                                        <p className="text-[9px] font-bold opacity-40 uppercase truncate">{p.medicines.map(m => m.name).join(', ')}</p>
+                                    </div>
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
 
-                {/* INVENTORY / CATALOG */}
+                {/* 2. INVENTORY / CATALOG */}
                 <div className="flex-1 flex flex-col rounded-2xl border shadow-sm overflow-hidden" style={cardStyle}>
                     <header className="p-7 border-b flex flex-col gap-6" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-background-secondary)' }}>
                         <div className="flex flex-wrap md:flex-nowrap gap-4 items-center">
@@ -393,7 +436,17 @@ const DispensaryPage = ({ user }) => {
                                     }
                                 </tbody>
                             </table>
-                            {inventory.length === 0 && <div className="py-20 text-center opacity-10"><Database className="w-12 h-12 mx-auto mb-4" /><p className="text-xs font-black uppercase tracking-[0.2em]">Zero Inventory Match</p></div>}
+                            {inventory.length === 0 && (
+                                <div className="py-28 flex flex-col items-center justify-center text-center" style={{ color: 'var(--luna-text-main)' }}>
+                                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-3 border border-white/5 opacity-20">
+                                        <Search className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-sm font-bold tracking-[0.2em] opacity-40 uppercase mb-1">Zero Assets</h3>
+                                    <p className="text-xs font-semibold opacity-30 max-w-[320px] leading-relaxed">
+                                        No matches found. Please try a different search term.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -421,9 +474,14 @@ const DispensaryPage = ({ user }) => {
 
                     <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3.5 custom-scrollbar" style={{ background: 'var(--luna-card)' }}>
                         {cart.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center opacity-30 space-y-4">
-                                <PackageOpen className="w-16 h-16" />
-                                <p className="text-[10px] font-black uppercase tracking-[0.3em]">Empty Terminal Cart</p>
+                            <div className="h-full flex flex-col items-center justify-center p-6 text-center" style={{ color: 'var(--luna-text-main)' }}>
+                                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-3 border border-white/5 opacity-20">
+                                    <ShoppingCart className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-sm font-bold tracking-[0.2em] opacity-40 uppercase mb-1">Empty Console</h3>
+                                <p className="text-[10px] font-semibold opacity-30 max-w-[200px] leading-relaxed">
+                                    No items staged for billing. Select items from the catalog.
+                                </p>
                             </div>
                         ) : (
                             cart.map(item => (

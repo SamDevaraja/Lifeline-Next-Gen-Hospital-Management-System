@@ -1,12 +1,10 @@
 import React, { useEffect, useState, useRef, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Activity, Users, Calendar, Settings, LogOut, LayoutDashboard,
-    ChevronRight, Search, Plus, HeartPulse, Sparkles, TrendingUp,
-    FileText, Bell, DollarSign, Stethoscope, BrainCircuit,
-    BarChart3, AlertCircle, CheckCircle, Clock, X, Menu,
-    Video, Pill, FlaskConical, Smartphone, QrCode, User, ArrowRight, Sun, Moon, Globe, ChevronDown, Filter,
-    Mail, Lock, Archive, Bed
+    Activity, AlertCircle, Archive, ArrowRight, BarChart3, Bed, BellRing, Calendar, CheckCircle, 
+    ChevronDown, ChevronRight, Clock, DollarSign, FileText, Filter, FlaskConical, Globe, 
+    HeartPulse, LayoutDashboard, Lock, LogOut, Mail, Menu, Moon, Pill, Plus, QrCode, Search, 
+    Settings, Smartphone, Stethoscope, Sun, TrendingUp, User, Users, Video, Wallet, X
 } from 'lucide-react';
 import { useNavigate, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Line } from 'recharts';
@@ -18,8 +16,8 @@ import { useTranslation } from 'react-i18next';
 import { LANGUAGES } from '../i18n/index.js';
 
 const LUNA = {
-    sky: 'var(--luna-teal)',
-    teal: 'var(--luna-blue)',
+    sky: 'var(--luna-primary)',
+    teal: 'var(--luna-primary)',
     steel: 'var(--luna-steel)',
     navy: 'var(--luna-navy)',
     dark: 'var(--luna-bg)',
@@ -52,8 +50,6 @@ const LabPage = lazy(() => import('./dashboard/LabPage'));
 const NotificationsPage = lazy(() => import('./dashboard/NotificationsPage'));
 const ReportsPage = lazy(() => import('./dashboard/ReportsPage'));
 const SettingsPage = lazy(() => import('./dashboard/SettingsPage'));
-const AIPage = lazy(() => import('./dashboard/AIPage'));
-const AdmissionsPage = lazy(() => import('./dashboard/AdmissionsPage'));
 
 const getNavGroups = (role) => {
     const r = (role || '').toLowerCase();
@@ -66,69 +62,47 @@ const getNavGroups = (role) => {
     const groups = [];
 
     let overviewLabel = 'Pulse Overview';
-    if (isAdmin) overviewLabel = 'Admin Dashboard';
-    else if (isDoctor) overviewLabel = 'Doctor Panel';
-    else if (isPatient) overviewLabel = 'My Health Hub';
+    if (isAdmin) overviewLabel = 'Admin Hub';
+    else if (isDoctor) overviewLabel = 'Doctor Terminal';
+    else if (isPatient) overviewLabel = 'My Health Portal';
     else if (isReceptionist) overviewLabel = 'Reception Desk';
-    else if (isPharmacist) overviewLabel = 'Pharmacy Panel';
+    else if (isPharmacist) overviewLabel = 'Pharmacy Desk';
 
     groups.push({
-        title: 'Platform Overview',
+        title: 'Platform Core',
         items: [
             { to: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: overviewLabel, exact: true },
         ]
     });
 
+    // ── Clinical Care Group ──
+    const careItems = [];
     if (isAdmin || isDoctor || isReceptionist) {
-        const opsItems = [];
-        if (isAdmin) {
-            opsItems.push({ to: '/dashboard/doctors', icon: <Stethoscope className="w-5 h-5" />, label: 'Specialists' });
-        }
-        if (isAdmin || isReceptionist || isDoctor) {
-            opsItems.push({ to: '/dashboard/patients', icon: <HeartPulse className="w-5 h-5" />, label: isDoctor ? 'My Patients' : 'Patient Registry' });
-        }
-        if (isAdmin || isReceptionist || isDoctor) {
-            opsItems.push({ to: '/dashboard/appointments', icon: <Calendar className="w-5 h-5" />, label: 'Schedule' });
-        }
-        if (isAdmin || isReceptionist || isDoctor) {
-            opsItems.push({ to: '/dashboard/admissions', icon: <Bed className="w-5 h-5" />, label: 'Ward Admissions' });
-        }
-        if (isAdmin || isDoctor) {
-            opsItems.push({ to: '/dashboard/records', icon: <FileText className="w-5 h-5" />, label: 'Clinical Records' });
-        }
-        if (isAdmin || isDoctor) {
-            opsItems.push({ to: '/dashboard/telemedicine', icon: <Video className="w-5 h-5" />, label: 'Tele-Consults' });
-        }
-        if (isAdmin || isDoctor || isPatient) {
-            opsItems.push({ to: '/dashboard/ai', icon: <BrainCircuit className="w-5 h-5" />, label: 'Clinical Intel' });
-        }
-        groups.push({ title: 'Clinical Operations', items: opsItems });
+        if (isAdmin) careItems.push({ to: '/dashboard/doctors', icon: <Stethoscope className="w-5 h-5" />, label: 'Medical Specialists' });
+        careItems.push({ to: '/dashboard/patients', icon: <Users className="w-5 h-5" />, label: isDoctor ? 'Patient Database' : 'Patient Registry' });
+        careItems.push({ to: '/dashboard/appointments', icon: <Calendar className="w-5 h-5" />, label: 'Service Schedule' });
     }
 
-    // Strict Clinical Side. No patient routes here.
+    if (isAdmin || isDoctor) {
+        careItems.push({ to: '/dashboard/records', icon: <FileText className="w-5 h-5" />, label: 'Clinical Records' });
+    }
+    if (careItems.length > 0) groups.push({ title: 'Clinical Operations', items: careItems });
 
+    // ── Pharmacy Hub ──
     if (isAdmin || isPharmacist || isDoctor) {
-        const invItems = [];
-        if (isAdmin || isPharmacist || isDoctor) {
-            invItems.push({ to: '/dashboard/pharmacy', icon: <Pill className="w-5 h-5" />, label: 'Pharmacy Core' });
-        }
-        if (isAdmin || isPharmacist) {
-            invItems.push({ to: '/dashboard/dispensary', icon: <Archive className="w-5 h-5" />, label: 'Dispensary Engine' });
-            invItems.push({ to: '/dashboard/lab', icon: <FlaskConical className="w-5 h-5" />, label: 'Diagnostics' });
-        }
-        groups.push({ title: 'Inventory & Labs', items: invItems });
+        const pharmItems = [];
+        pharmItems.push({ to: '/dashboard/pharmacy', icon: <Pill className="w-5 h-5" />, label: 'Pharmacy Inventory' });
+        groups.push({ title: 'Institutional Pharmacy', items: pharmItems });
     }
 
-
+    // ── Finance & Analytics ──
     if (isAdmin || isReceptionist || isPatient) {
         const finItems = [];
-        if (isAdmin || isReceptionist || isPatient) {
-            finItems.push({ to: '/dashboard/billing', icon: <DollarSign className="w-5 h-5" />, label: isPatient ? 'My Bills' : 'Billing Engine' });
-        }
+        finItems.push({ to: '/dashboard/billing', icon: <Wallet className="w-5 h-5" />, label: isPatient ? 'My Account' : 'Billing Engine', badge: 'LIVE' });
         if (isAdmin) {
-            finItems.push({ to: '/dashboard/reports', icon: <BarChart3 className="w-5 h-5" />, label: 'Analytics' });
+            finItems.push({ to: '/dashboard/reports', icon: <BarChart3 className="w-5 h-5" />, label: 'Enterprise Analytics' });
         }
-        groups.push({ title: 'Finance & Governance', items: finItems });
+        groups.push({ title: 'Institutional Governance', items: finItems });
     }
 
     return groups;
@@ -157,7 +131,16 @@ const Dashboard = () => {
     const currentLang = LANGUAGES.find(l => l.code === i18n.language) || LANGUAGES[0];
     const [unreadCount, setUnreadCount] = useState(0);
 
+    useEffect(() => {
+        if (user?.role) {
+            document.documentElement.setAttribute('data-role', user.role.toLowerCase());
+        } else {
+            document.documentElement.setAttribute('data-role', 'admin');
+        }
+    }, [user]);
+
     const fetchNotificationsGlobally = async () => {
+        if (!localStorage.getItem('token')) return;
         try {
             const res = await api.get('notifications/');
             const unread = res.data.filter(n => !n.is_read).length;
@@ -177,9 +160,8 @@ const Dashboard = () => {
             let interval = setInterval(fetchNotificationsGlobally, 45000);
 
             const handleVisibility = () => {
-                if (document.hidden) {
-                    clearInterval(interval);
-                } else {
+                clearInterval(interval);
+                if (!document.hidden) {
                     fetchNotificationsGlobally();
                     interval = setInterval(fetchNotificationsGlobally, 45000);
                 }
@@ -231,7 +213,8 @@ const Dashboard = () => {
 
     useEffect(() => {
         const fetchUser = async () => {
-            if (!localStorage.getItem('token')) { navigate('/login'); return; }
+            const token = localStorage.getItem('token');
+            if (!token) { navigate('/login'); return; }
             try {
                 const res = await api.get('me/');
                 setUser(res.data);
@@ -280,89 +263,164 @@ const Dashboard = () => {
                     {/* Mobile overlay */}
                     {sidebarOpen && <div className="fixed inset-0 z-30 md:hidden bg-black bg-opacity-50" onClick={() => setSidebarOpen(false)} />}
 
-                    <aside className={`fixed left-0 top-0 h-screen w-64 flex flex-col z-40 transition-transform duration-300
-                                    ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
-                        style={{
-                            background: 'var(--luna-card)',
-                            borderRight: '1px solid var(--luna-border)',
-                            boxShadow: '10px 0 50px rgba(0,0,0,0.02)'
-                        }}>
+                <aside className={`fixed left-0 top-0 h-screen w-64 xl:w-72 flex flex-col z-40 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+                    style={{
+                        background: 'var(--luna-card)',
+                        borderRight: '1px solid var(--luna-border)',
+                        boxShadow: '10px 0 50px rgba(0,0,0,0.02)'
+                    }}>
 
-                        {/* Logo Section - Detached Aesthetic */}
-                        <div className="pt-8 pb-6 flex items-center justify-between px-6 shrink-0" style={{ borderBottom: '1px solid var(--luna-border)' }}>
-                            <div className="flex items-center gap-3">
-                                <div className="p-0.5 rounded-2xl" style={{ background: 'rgba(30, 58, 138, 0.03)' }}>
-                                    <img src={logo} alt="Lifeline" className="w-9 h-9 object-contain drop-shadow-md" />
-                                </div>
-                                <div>
-                                    <p className="font-black text-[1.35rem] uppercase tracking-tighter" style={{ color: 'var(--luna-text-main)' }}>
-                                        Lifeline <span style={{ color: 'var(--luna-blue)' }}>HMS</span>
-                                    </p>
-                                    <p className="text-[8.5px] uppercase font-black tracking-[0.12em] opacity-60 mt-0.5" style={{ color: 'var(--luna-text-main)' }}>Hospital Management System</p>
-                                </div>
+                    {/* Logo Section - Detached Aesthetic */}
+                    <div className="pt-8 pb-6 flex items-center justify-between px-6 shrink-0" style={{ borderBottom: '1px solid var(--luna-border)' }}>
+                        <div className="flex items-center gap-3">
+                            <div className="p-0.5 rounded-2xl" style={{ background: 'rgba(30, 58, 138, 0.03)' }}>
+                                <img src={logo} alt="Lifeline" className="w-9 h-9 object-contain drop-shadow-md" />
                             </div>
-                            <button className="md:hidden p-1" style={{ color: LUNA.sky }} onClick={() => setSidebarOpen(false)}>
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        {/* User Profile - Zero Noise Edition */}
-                        <div className="mx-6 mt-1 flex items-center gap-3 group cursor-pointer py-2 px-3 rounded-2xl transition-all hover:bg-[var(--luna-info-bg)] border border-transparent hover:border-[var(--luna-border)]">
-                            <div className="relative">
-                                <div className="w-11 h-11 rounded-xl avatar shadow-2xl ring-1 ring-[var(--luna-border)] group-hover:ring-[var(--luna-teal)] transition-all duration-300 flex items-center justify-center">
-                                    <User className="w-7 h-7 text-white" strokeWidth={2.5} />
-                                </div>
-                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 shadow-sm" style={{ background: 'var(--luna-success-text)', borderColor: 'var(--luna-bg)' }} />
-                            </div>
-                            <div className="flex flex-col justify-center">
-                                <p className="text-[14.5px] font-black uppercase tracking-wider group-hover:text-[var(--luna-teal)] transition-colors" style={{ color: 'var(--luna-text-main)' }}>
-                                    {user?.first_name ? `${user.first_name}` : user?.role || 'ADMIN'}
+                            <div>
+                                <p className="font-black text-[1.35rem] uppercase tracking-tighter" style={{ color: 'var(--luna-text-main)' }}>
+                                    Lifeline <span style={{ color: 'var(--luna-blue)' }}>HMS</span>
                                 </p>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--luna-teal)' }}>Online</span>
+                                <p className="text-[8.5px] uppercase font-black tracking-[0.12em] opacity-40 mt-0.5" style={{ color: 'var(--luna-text-main)' }}>Clinical Command Center</p>
+                            </div>
+                        </div>
+                        <button className="md:hidden p-1" style={{ color: 'var(--luna-primary)' }} onClick={() => setSidebarOpen(false)}>
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    {/* User Profile Card - EXECUTIVE PROFILE EDITION */}
+                    <div className="mx-5 mt-6 flex items-center justify-between p-3.5 rounded-2xl border transition-all group cursor-pointer hover:bg-white/[0.03]"
+                         style={{ 
+                             background: theme === 'dark' ? 'var(--luna-navy)' : 'rgba(30, 58, 138, 0.03)', 
+                             borderColor: 'var(--luna-border)' 
+                         }}>
+                        <div className="flex items-center gap-3.5">
+                            <div className="relative">
+                                <div className="w-11 h-11 rounded-xl shadow-2xl flex items-center justify-center border transition-all group-hover:scale-105" 
+                                     style={{ 
+                                         background: 'var(--luna-card)', 
+                                         borderColor: 'var(--luna-border)',
+                                         color: 'var(--luna-teal)' 
+                                     }}>
+                                    <User className={`w-5 h-5 ${theme === 'dark' ? 'text-white' : 'text-[var(--luna-teal)]'}`} />
+                                </div>
+                                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 bg-emerald-500 animate-pulse" 
+                                     style={{ borderColor: theme === 'dark' ? 'var(--luna-navy)' : '#fff' }} />
+                            </div>
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                                <p className="text-[13px] font-black uppercase tracking-wider leading-none truncate" style={{ color: 'var(--luna-text-main)' }}>
+                                    {user?.first_name || user?.role || 'Staff'}
+                                </p>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[8px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--luna-text-dim)' }}>Access Core:</span>
+                                    <span className="text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border" 
+                                          style={{ 
+                                              background: 'var(--luna-success-bg)', 
+                                              color: 'var(--luna-success-text)',
+                                              borderColor: 'var(--luna-success-text)',
+                                              opacity: 0.8
+                                          }}>
+                                        {user?.role?.toUpperCase() || 'SYSTEM'}
+                                    </span>
                                 </div>
                             </div>
                         </div>
+                        <ChevronRight className="w-3.5 h-3.5 opacity-10 group-hover:opacity-100 group-hover:text-[var(--luna-teal)] transition-all" />
+                    </div>
 
-                        {/* Nav */}
-                        <nav className="sidebar-nav flex-grow px-4 py-2 space-y-1 overflow-y-auto mt-2 custom-scrollbar">
-                            {getNavGroups(user?.role).map((group, gi) => (
-                                <div key={gi} className="space-y-0.5">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.25em] px-4 pt-4 pb-2 opacity-70 hover:opacity-100 transition-opacity" style={{ color: 'var(--luna-text-main)' }}>
-                                        {group.title}
-                                    </p>
-                                    {group.items.map(item => {
-                                        const active = isActive(item) || (item.exact && location.pathname === '/dashboard');
-                                        return (
-                                            <Link key={item.to} to={item.to}
-                                                className={`sidebar-link ${active ? 'active' : ''}`}
-                                                onClick={() => setSidebarOpen(false)}>
-                                                <div className="flex items-center gap-3">
-                                                    {item.icon}
-                                                    <span className="truncate">{item.label}</span>
+                    {/* Nav: HIGH-FIDELITY TREE ARCHITECTURE */}
+                    <nav className="flex-grow px-4 py-2 space-y-0.5 overflow-y-auto mt-2 custom-scrollbar">
+                        {getNavGroups(user?.role).map((group, gi) => (
+                            <div key={gi} className="mb-4 last:mb-0">
+                                <p className="nav-group-title">{group.title}</p>
+                                <div className="space-y-0.5">
+                                        {group.items.map(item => {
+                                            const active = isActive(item);
+                                            const hasChildren = item.children && item.children.length > 0;
+                                            const [isOpen, setIsOpen] = useState(active);
+
+                                            return (
+                                                <div key={item.to} className="relative">
+                                                    <Link to={hasChildren ? '#' : item.to}
+                                                        className={`sidebar-link ${active ? 'active' : ''}`}
+                                                        onClick={(e) => {
+                                                            if (hasChildren) {
+                                                                e.preventDefault();
+                                                                setIsOpen(!isOpen);
+                                                            } else {
+                                                                setSidebarOpen(false);
+                                                            }
+                                                        }}>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`transition-colors ${active ? 'text-[var(--luna-teal)]' : 'opacity-40'}`}>
+                                                                {item.icon}
+                                                            </div>
+                                                            <span className="truncate">{item.label}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {item.badge && (
+                                                                <span className="text-[9px] font-black bg-[var(--luna-teal)] text-white px-1.5 py-0.5 rounded-full shadow-lg">
+                                                                    {item.badge}
+                                                                </span>
+                                                            )}
+                                                            {hasChildren && (
+                                                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 opacity-30 ${isOpen ? 'rotate-180' : ''}`} />
+                                                            )}
+                                                            {!hasChildren && (
+                                                                <ChevronRight className={`w-3 h-3 transition-all ${active ? 'opacity-30' : 'opacity-0'}`} />
+                                                            )}
+                                                        </div>
+                                                    </Link>
+
+                                                    {/* Nested Sub-List with Guide Lines */}
+                                                    <AnimatePresence>
+                                                        {hasChildren && isOpen && (
+                                                            <motion.div 
+                                                                initial={{ opacity: 0, height: 0 }}
+                                                                animate={{ opacity: 1, height: 'auto' }}
+                                                                exit={{ opacity: 0, height: 0 }}
+                                                                className="nav-sub-list overflow-hidden"
+                                                            >
+                                                                {item.children.map(child => (
+                                                                    <Link 
+                                                                        key={child.to} 
+                                                                        to={child.to}
+                                                                        className={`nav-sub-item ${isActive(child) ? 'active' : ''}`}
+                                                                        onClick={() => setSidebarOpen(false)}
+                                                                    >
+                                                                        {child.label}
+                                                                    </Link>
+                                                                ))}
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
                                                 </div>
-                                                <ChevronRight className={`w-3 h-3 transition-opacity ${active ? 'opacity-100' : 'opacity-0'}`} />
-                                            </Link>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             ))}
                         </nav>
 
-                        {/* Bottom */}
-                        <div className="px-4 pb-6 pt-4 space-y-1" style={{ borderTop: '1px solid var(--luna-border)' }}>
-                            <Link to="/dashboard/settings" className="sidebar-link">
-                                <div className="flex items-center gap-3"><Settings className="w-4 h-4 opacity-70" /><span>Settings</span></div>
+                        {/* Bottom: Institutional Controls */}
+                        <div className="px-4 pb-6 pt-4 space-y-1 mt-auto" style={{ borderTop: '1px solid var(--luna-border)' }}>
+                            <Link to="/dashboard/settings" className="sidebar-link transition-all hover:pl-6">
+                                <div className="flex items-center gap-3">
+                                    <Settings className="w-4 h-4 opacity-30" />
+                                    <span>Settings</span>
+                                </div>
                             </Link>
-                            <button onClick={handleLogout} className="sidebar-link w-full text-left">
-                                <div className="flex items-center gap-3 opacity-80 hover:opacity-100 transition-opacity" style={{ color: 'var(--luna-danger-text)' }}><LogOut className="w-4 h-4" /><span>Sign Out</span></div>
+                            <button onClick={handleLogout} className="sidebar-link w-full text-left transition-all hover:pl-6 group">
+                                <div className="flex items-center gap-3" style={{ color: 'var(--luna-danger-text)' }}>
+                                    <LogOut className="w-4 h-4 opacity-30 group-hover:opacity-100" />
+                                    <span>Sign Out</span>
+                                </div>
                             </button>
                         </div>
                     </aside>
                 </div>
             )}
             {/* Main */}
-            <div className={`flex-grow flex flex-col h-screen overflow-hidden ${user?.role?.toLowerCase() !== 'pharmacist' ? 'md:ml-64' : ''}`}>
+            <div className={`flex-grow flex flex-col h-screen overflow-hidden ${user?.role?.toLowerCase() !== 'pharmacist' ? 'md:ml-64 xl:ml-72' : ''}`}>
                 {/* Topbar - Floating Institutional Pill */}
                 <header className="mt-4 mx-6 rounded-2xl border flex items-center justify-between px-6 sticky top-4 z-30 shrink-0 h-16"
                     style={{
@@ -415,8 +473,8 @@ const Dashboard = () => {
                                     {theme === 'dark' ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
                                 </button>
                                 <Link to="/dashboard/notifications" className="w-10 h-10 rounded-xl flex items-center justify-center transition-all border shrink-0 relative" style={{ color: 'var(--luna-teal)', borderColor: 'var(--luna-border)' }}>
-                                    <Bell className="w-4.5 h-4.5" />
-                                    <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 border-2" style={{ borderColor: 'var(--luna-nav-bg)' }} />
+                                    <BellRing className="w-4.5 h-4.5" />
+                                    {unreadCount > 0 && <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 border-2" style={{ borderColor: 'var(--luna-nav-bg)' }} />}
                                 </Link>
                                 <button onClick={handleLogout} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl transition-all bg-red-600 shrink-0">
                                     <LogOut className="w-4 h-4" /> <span className="hidden xl:inline">Sign Out</span>
@@ -427,15 +485,14 @@ const Dashboard = () => {
                         <div className="flex items-center justify-between w-full h-full">
                             <div className="flex items-center gap-4">
                                 <button className="md:hidden p-2 rounded-xl" onClick={() => setSidebarOpen(true)} style={{ color: 'var(--luna-steel)' }}><Menu className="w-5 h-5" /></button>
-                                <div className="relative hidden md:block">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--luna-blue)' }} />
-                                    <input id="dashboard-search" type="text" placeholder="Search institutional database..." className="input !pl-14 py-2 pr-4 text-sm w-80 h-9 shadow-inner" />
-                                </div>
                             </div>
                             <div className="flex items-center gap-2 notranslate" translate="no">
                                 <div className="relative" ref={langRef}>
-                                    <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all border" style={{ color: 'var(--luna-teal)', background: langOpen ? 'var(--luna-info-bg)' : 'transparent', borderColor: langOpen ? 'var(--luna-teal)' : 'var(--luna-border)' }} onClick={() => setLangOpen(!langOpen)}>
-                                        <Globe className="w-3.5 h-3.5" /> <span>{currentLang.flag} {currentLang.label}</span> <ChevronDown className={`w-3 h-3 transition-transform ${langOpen ? 'rotate-180' : ''}`} />
+                                    <button className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shadow-2xl backdrop-blur-md active:scale-95" style={{ color: 'var(--luna-text-main)', background: 'rgba(255, 255, 255, 0.03)', borderColor: 'var(--luna-border)' }} onClick={() => setLangOpen(!langOpen)}>
+                                        <Globe className="w-3.5 h-3.5 opacity-60" style={{ color: 'var(--luna-teal)' }} />
+                                        <span className="hidden sm:inline">{currentLang.code.toUpperCase()}</span>
+                                        <span className="sm:hidden">{currentLang.code.toUpperCase()}</span>
+                                        <ChevronDown className="w-3 h-3 opacity-40" />
                                     </button>
                                     {langOpen && (
                                         <div className="absolute right-0 mt-2 w-52 rounded-2xl overflow-hidden z-50 shadow-2xl border" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
@@ -450,9 +507,8 @@ const Dashboard = () => {
                                     )}
                                 </div>
                                 <button onClick={toggleTheme} className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:bg-[var(--luna-border)]" style={{ background: 'var(--luna-info-bg)', color: 'var(--luna-teal)' }}>{theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}</button>
-                                <div className="badge-live hidden md:flex h-8"><span className="w-2 h-2 rounded-full bg-current animate-ping" /> AI Core Active </div>
                                 <Link to="/dashboard/notifications" className="w-8 h-8 rounded-xl flex items-center justify-center relative transition-all hover:bg-[var(--luna-border)]" style={{ background: 'var(--luna-info-bg)', color: 'var(--luna-text-muted)' }}>
-                                    <Bell className="w-4 h-4" />
+                                    <BellRing className="w-4 h-4" />
                                     {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-white text-[8px] font-black flex items-center justify-center" style={{ background: 'var(--luna-danger-text)' }}>{unreadCount}</span>}
                                 </Link>
                             </div>
@@ -465,7 +521,7 @@ const Dashboard = () => {
                     {loading ? (
                         <div className="flex items-center justify-center h-full">
                             <div className="animate-pulse flex flex-col items-center">
-                                <div className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mb-4" style={{ borderColor: 'var(--luna-teal)', borderTopColor: 'transparent' }} />
+                                <div className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mb-4" style={{ borderColor: 'var(--luna-primary)', borderTopColor: 'transparent' }} />
                                 <p className="font-bold text-sm" style={{ color: 'var(--luna-text-muted)' }}>Synchronizing Clinical Environment...</p>
                             </div>
                         </div>
@@ -475,14 +531,12 @@ const Dashboard = () => {
                                 <Route path="/doctors" element={<Suspense fallback={null}><ResourceList type="doctors" title="Medical Specialists" user={user} /></Suspense>} />
                                 <Route path="/patients" element={<Suspense fallback={<LoadingState />}><ResourceList type="patients" title="Patient Registry" user={user} /></Suspense>} />
                                 <Route path="/appointments" element={<Suspense fallback={<LoadingState />}><AppointmentList user={user} /></Suspense>} />
-                                <Route path="/admissions" element={<Suspense fallback={<LoadingState />}><AdmissionsPage user={user} /></Suspense>} />
                                 <Route path="/billing" element={<Suspense fallback={<LoadingState />}><BillingPage user={user} /></Suspense>} />
                                 <Route path="/records" element={<Suspense fallback={<LoadingState />}><RecordsPage user={user} /></Suspense>} />
                                 <Route path="/telemedicine" element={<Suspense fallback={<LoadingState />}><TelemedicinePage user={user} /></Suspense>} />
                                 <Route path="/pharmacy" element={<PharmacyPage user={user} />} />
                                 <Route path="/dispensary" element={<DispensaryPage user={user} />} />
                                 <Route path="/lab" element={<Suspense fallback={<LoadingState />}><LabPage user={user} /></Suspense>} />
-                                <Route path="/ai" element={<Suspense fallback={<LoadingState />}><AIPage user={user} /></Suspense>} />
                                 <Route path="/notifications" element={<Suspense fallback={null}><NotificationsPage user={user} /></Suspense>} />
                                 <Route path="/reports" element={<Suspense fallback={null}><ReportsPage user={user} /></Suspense>} />
                                 <Route path="/settings" element={<Suspense fallback={null}><SettingsPage user={user} onUpdate={async () => {

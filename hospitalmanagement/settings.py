@@ -96,19 +96,25 @@ WSGI_APPLICATION = 'hospitalmanagement.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/3.0/ref/settings/#databases
+# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-# PostgreSQL (Neon DB via dj-database-url)
-# The fallback allows the app to work out of the box with the string you provided if no environment variable is set.
-default_db_url = 'postgresql://neondb_owner:npg_HOvuD4QTq2gh@ep-restless-credit-a1ljweik-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
-
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.getenv('DATABASE_URL', default_db_url),
-        conn_max_age=600,
-        ssl_require=True,
-    )
-}
+if DEBUG:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        }
+    }
+else:
+    # PostgreSQL (Neon DB via dj-database-url) for production
+    default_db_url = 'postgresql://neondb_owner:npg_HOvuD4QTq2gh@ep-restless-credit-a1ljweik-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.getenv('DATABASE_URL', default_db_url),
+            conn_max_age=600,
+            ssl_require=True,
+        )
+    }
 
 # SQLite fallback (development only)
 # DATABASES = {
@@ -126,6 +132,14 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user': '1000/day'
+    }
 }
 
 CORS_ALLOW_ALL_ORIGINS = True  # Allows your deployed frontend to talk to this backend # For development
@@ -176,24 +190,21 @@ MEDIA_ROOT=os.path.join(BASE_DIR,'static')
 LOGIN_REDIRECT_URL='/afterlogin'
 
 # --- Production-Ready Email Configuration ---
-# In deployment, the server will read these variables from the cloud environment.
-# For local testing, we route all official OTP emails to the Ethereal Sandbox.
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+# Active Clinical SMTP Layer for Real-World Gmail Dispatch
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'YOUR_GMAIL_ADDRESS@gmail.com')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'YOUR_16_LETTER_APP_PASSWORD')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 
 # Set the default "From" address to show patients a professional email
 DEFAULT_FROM_EMAIL = 'support@lifeline.health'
 # Auth & Verification Controls
-ACCOUNT_USER_MODEL_USERNAME_FIELD = 'username'
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_USERNAME_REQUIRED = True
+ACCOUNT_LOGIN_METHODS = {'username', 'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']
 # Email verification disabled as per latest requirements
 ACCOUNT_EMAIL_VERIFICATION = 'none'
-ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
 REST_AUTH_SERIALIZERS = {
     'PASSWORD_RESET_SERIALIZER': 'hospital.serializers.CustomPasswordResetSerializer',
 }

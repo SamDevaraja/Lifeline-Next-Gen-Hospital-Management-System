@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
     DollarSign, Search, Plus, Filter, FileText, Download, Eye, 
     TrendingUp, CreditCard, Receipt, Clock, CheckCircle2, ChevronRight,
-    ArrowUpRight, ArrowDownRight, Activity
+    ArrowUpRight, ArrowDownRight, Activity, RefreshCw
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast, { Toaster } from 'react-hot-toast';
@@ -59,6 +59,17 @@ const BillingPage = ({ user }) => {
             count: sb.length
         };
     }, [bills]);
+
+    const handleMarkPaid = async (id, invoiceNum) => {
+        try {
+            toast.loading(`Finalizing Invoice: ${invoiceNum}...`, { id: 'pay' });
+            await api.post(`bills/${id}/mark_paid/`, { payment_method: 'Digital Transfer' });
+            toast.success('Invoice settled.', { id: 'pay' });
+            fetchBills();
+        } catch (err) {
+            toast.error('Payment reconciliation failed.', { id: 'pay' });
+        }
+    };
 
     const handleDownloadPDF = async (id, invoiceNum) => {
         try {
@@ -118,128 +129,162 @@ const BillingPage = ({ user }) => {
                 onCancel={() => setInvoiceModal({ open: false })}
             />
 
-            {/* Standard Project Header */}
+            {/* Header Row - 1:1 Parity with Records */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold" style={{ color: 'var(--luna-text-main)' }}>Billing Engine</h1>
-                    <p className="text-sm font-medium mt-1" style={{ color: 'var(--luna-text-muted)' }}>
-                        Institutional Payments • Insurance & Revenue Ledger
-                    </p>
+                    <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Patient Billing</h1>
+                    <div className="flex items-center gap-3 mt-1">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40" style={{ color: 'var(--luna-text-muted)' }}>
+                            Manage patient invoices and payments
+                        </p>
+                        <div className="w-1 h-1 rounded-full opacity-20" style={{ background: 'var(--luna-text-main)' }} />
+                        <button onClick={fetchBills} className={`p-1 opacity-40 hover:opacity-100 transition-all ${loading ? 'animate-spin' : ''}`}>
+                             <RefreshCw className="w-3 h-3" />
+                         </button>
+                    </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 z-10 opacity-30" style={{ color: LUNA.teal }} />
-                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Scoping invoices..."
-                            className="w-48 md:w-64 pl-12 py-3 text-sm rounded-xl outline-none border transition-all font-bold tracking-tight focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500/20"
-                            style={{ background: 'var(--luna-navy)', color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }} />
+                    <div className="relative group w-full md:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 opacity-30" />
+                        <input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            type="text"
+                            placeholder="Search ledger..."
+                            className="w-full pl-9 pr-3 py-2 text-xs border rounded-lg outline-none transition-all font-bold tracking-tight bg-[var(--luna-card)]"
+                            style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}
+                        />
                     </div>
+
+                    <div className="relative">
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="w-full pl-3 pr-8 py-2 text-xs border rounded-lg appearance-none cursor-pointer focus:outline-none bg-[var(--luna-card)]"
+                            style={{ color: theme === 'dark' ? 'white' : 'var(--luna-blue)', borderColor: 'var(--luna-border)' }}
+                        >
+                            <option value="all">All Status</option>
+                            <option value="paid">PAID</option>
+                            <option value="pending">PENDING</option>
+                        </select>
+                        <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 opacity-30 pointer-events-none" />
+                    </div>
+
                     {user?.role === 'admin' && (
-                        <button onClick={() => setInvoiceModal({ open: true })} 
-                            className="btn-primary text-[10px] font-black uppercase tracking-widest px-6 h-[46px] flex items-center gap-2 shadow-xl">
-                            <Plus className="w-4 h-4" /> New Invoice
+                        <button
+                            onClick={() => setInvoiceModal({ open: true })}
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-hover transition-colors shadow-sm">
+                            <Plus className="w-3.5 h-3.5" /> New Invoice
                         </button>
                     )}
                 </div>
             </div>
 
-            {/* Financial Stat Matrix - Museum Clean Edition */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 px-1">
+            {/* Mini Stats Row - Pulse Grid Pattern (Records 1:1) */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                    { label: 'Total Revenue', prefix: '₹', value: (stats.revenue / 1000).toFixed(1) + 'k', color: '#10b981', icon: <TrendingUp className="w-5 h-5"/>, bg: 'rgba(16, 185, 129, 0.08)' },
-                    { label: 'Pending Collection', prefix: '₹', value: (stats.pending / 1000).toFixed(1) + 'k', color: '#f59e0b', icon: <Clock className="w-5 h-5"/>, bg: 'rgba(245, 158, 11, 0.08)' },
-                    { label: 'Today Invoiced', prefix: '₹', value: (stats.paidToday / 1000).toFixed(1) + 'k', color: 'var(--luna-blue)', icon: <Receipt className="w-5 h-5"/>, bg: 'rgba(30, 58, 138, 0.08)' },
-                    { label: 'Active Ledger', prefix: '', value: stats.count, color: 'var(--luna-steel)', icon: <CreditCard className="w-5 h-5"/>, bg: 'rgba(148, 163, 184, 0.08)' },
+                    { label: 'Total Revenue', value: '₹' + (stats.revenue / 1000).toFixed(1) + 'k', color: 'var(--luna-teal)' },
+                    { label: 'Pending Collection', value: '₹' + (stats.pending / 1000).toFixed(1) + 'k', color: '#f59e0b' },
+                    { label: 'Today Invoiced', value: '₹' + (stats.paidToday / 1000).toFixed(1) + 'k', color: '#10b981' },
+                    { label: 'Active Ledger', value: stats.count, color: '#6366f1' },
                 ].map((s, i) => (
-                    <div key={i} className="card p-4 flex items-center gap-3 border transition-all hover:-translate-y-1"
-                        style={{ 
-                            background: 'var(--luna-card)', 
-                            borderColor: 'var(--luna-border)', 
-                            borderRadius: '1.5rem',
-                            boxShadow: '0 10px 25px rgba(0,0,0,0.03)' 
-                        }}>
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center font-black border shrink-0 backdrop-blur-md"
-                            style={{ background: s.bg, color: s.color, borderColor: 'rgba(255,255,255,0.05)' }}>
-                            {s.icon}
-                        </div>
-                        <div className="flex flex-col justify-center">
-                            <p className="text-[9px] font-black uppercase opacity-40 mb-0.5 tracking-[0.2em]" style={{ color: 'var(--luna-text-main)' }}>{s.label}</p>
-                            <h3 className="text-[20px] font-black tracking-tighter leading-none flex items-baseline gap-0.5" style={{ color: 'var(--luna-text-main)' }}>
-                                {s.prefix && <span className="text-[14px] font-extrabold opacity-60">{s.prefix}</span>}
-                                {s.value}
-                            </h3>
-                        </div>
+                    <div key={i} className="p-4 border rounded-xl shadow-sm bg-[var(--luna-card)]" style={{ borderColor: 'var(--luna-border)' }}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-1" style={{ fontFamily: "'Inter', sans-serif" }}>{s.label}</p>
+                        <p className="text-2xl font-bold" style={{ color: s.color, fontFamily: "'Inter', sans-serif" }}>{s.value}</p>
                     </div>
+
                 ))}
             </div>
 
-            {/* Master Billing Ledger - Institutional Table Format */}
-            <div className="card overflow-hidden p-0 shadow-2xl rounded-2xl border" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
+            {/* Master Ledger - Institutional Table Format */}
+            <div className="card overflow-hidden !p-0 shadow-sm rounded-xl border" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
                 <div className="overflow-x-auto custom-scrollbar">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr style={{ background: 'var(--luna-navy)', borderBottom: '1px solid var(--luna-border)' }}>
-                                <th className="pl-10 pr-4 py-5 text-[10px] font-black uppercase tracking-[0.25em] opacity-60" style={{ color: 'var(--luna-text-main)' }}>Invoice Details</th>
-                                <th className="px-4 py-5 text-[10px] font-black uppercase tracking-[0.25em] opacity-60" style={{ color: 'var(--luna-text-main)' }}>Patient MRN</th>
-                                <th className="px-4 py-5 text-[10px] font-black uppercase tracking-[0.25em] opacity-60 text-center" style={{ color: 'var(--luna-text-main)' }}>Billed Amount</th>
-                                <th className="px-4 py-5 text-center text-[10px] font-black uppercase tracking-[0.25em] opacity-60" style={{ color: 'var(--luna-text-main)' }}>Service Date</th>
-                                <th className="px-4 py-5 text-[10px] font-black uppercase tracking-[0.25em] opacity-60 text-center" style={{ color: 'var(--luna-text-main)' }}>Fulfillment</th>
-                                <th className="pr-10 py-5 text-right text-[10px] font-black uppercase tracking-[0.25em] opacity-60" style={{ color: 'var(--luna-text-main)' }}>Action Hub</th>
+                            <tr style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderBottom: '1px solid var(--luna-border)' }}>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] opacity-60" style={{ color: 'var(--luna-text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Invoice</th>
+                                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] opacity-60 hidden sm:table-cell" style={{ color: 'var(--luna-text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Patient</th>
+                                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] opacity-60" style={{ color: 'var(--luna-text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Amount</th>
+                                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] opacity-60 hidden sm:table-cell" style={{ color: 'var(--luna-text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Date</th>
+                                <th className="px-4 py-4 text-center text-[10px] font-black uppercase tracking-[0.15em] opacity-60 hidden sm:table-cell" style={{ color: 'var(--luna-text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Status</th>
+                                <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-[0.15em] opacity-60" style={{ color: 'var(--luna-text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Actions</th>
                             </tr>
                         </thead>
+
                         <tbody>
                             {loading ? (
                                 Array(5).fill(0).map((_, i) => (
-                                    <tr key={i}><td colSpan="6" className="px-10 py-8"><div className="animate-pulse h-12 rounded-2xl w-full" style={{ background: 'var(--luna-navy)' }} /></td></tr>
+                                    <tr key={i}><td colSpan="6" className="px-6 py-8"><div className="animate-pulse h-12 rounded-xl w-full" style={{ background: 'var(--luna-navy)' }} /></td></tr>
                                 ))
                             ) : filtered.length === 0 ? (
-                                <tr><td colSpan="6" className="text-center py-32 text-[var(--luna-text-muted)] italic font-bold">No financial interactions identified.</td></tr>
+                                <tr>
+                                    <td colSpan="6" className="text-center py-28" style={{ color: 'var(--luna-text-main)' }}>
+                                        <div className="flex flex-col items-center">
+                                            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-3 border border-white/5 opacity-20">
+                                                <Search className="w-6 h-6" />
+                                            </div>
+                                            <h3 className="text-sm font-bold tracking-[0.2em] opacity-40 uppercase mb-1">No Results Found</h3>
+                                            <p className="text-xs font-semibold opacity-30 max-w-[320px] leading-relaxed">
+                                                No matches found. Please try a different search term.
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
                             ) : filtered.map((b, i) => (
                                 <tr key={b.id || i} className="group hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b last:border-0" style={{ borderColor: 'var(--luna-border)' }}>
-                                    <td className="pl-10 pr-4 py-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs border bg-black/5 dark:bg-white/5" style={{ borderColor: 'var(--luna-border)' }}>
-                                                <Receipt className="w-4 h-4 opacity-40" />
+                                    <td className="px-6 py-3 md:py-4">
+                                        <div className="flex items-center gap-3 md:gap-4">
+                                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center border shadow-inner shrink-0"
+                                                style={{ background: 'var(--luna-navy)', borderColor: 'var(--luna-border)' }}>
+                                                <Receipt className="w-3.5 h-3.5 md:w-4 md:h-4 opacity-40" />
                                             </div>
-                                            <div>
-                                                <p className="font-extrabold text-[14px]" style={{ color: 'var(--luna-text-main)' }}>{b.invoice_number}</p>
-                                                <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mt-0.5">TXID: {String(b.id).padStart(6, '0')}</p>
+                                            <div className="whitespace-nowrap">
+                                                <p className="font-extrabold text-[12px] md:text-[14px]" style={{ color: 'var(--luna-text-main)' }}>{b.invoice_number}</p>
+                                                <p className="text-[8px] md:text-[9px] font-semibold uppercase tracking-widest opacity-40" style={{ color: 'var(--luna-text-muted)' }}>ID: {String(b.id).padStart(4, '0')} • SYNCED</p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-4 py-4">
-                                        <p className="font-extrabold text-[14px]" style={{ color: 'var(--luna-text-main)' }}>{b.patient_name || 'Emergency Guest'}</p>
-                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mt-0.5">Clinical MRN Identification</p>
+
+                                    <td className="px-4 py-4 hidden sm:table-cell">
+                                        <p className="font-medium text-[13px]" style={{ color: 'var(--luna-text-main)' }}>{b.patient_name || 'Emergency Guest'}</p>
                                     </td>
-                                    <td className="px-4 py-4 text-center">
-                                        <p className="font-black text-[16px] tracking-tighter" style={{ color: 'var(--luna-text-main)' }}>₹{parseFloat(b.total_amount).toLocaleString()}</p>
-                                        <p className="text-[8px] font-black uppercase opacity-30 mt-0.5">Gross Billing</p>
+                                    <td className="px-4 py-3 md:py-4">
+                                        <p className="font-semibold text-[14px] tracking-tight whitespace-nowrap" style={{ color: 'var(--luna-text-main)' }}>₹{parseFloat(b.total_amount).toLocaleString()}</p>
                                     </td>
-                                    <td className="px-4 py-4 text-center">
-                                        <p className="font-extrabold text-[13px]" style={{ color: 'var(--luna-text-muted)' }}>{b.bill_date}</p>
-                                        <p className="text-[8px] font-black uppercase opacity-30 mt-0.5">Timestamped</p>
+
+                                    <td className="px-4 py-4 hidden sm:table-cell">
+                                        <p className="font-medium text-[12px]" style={{ color: 'var(--luna-text-muted)' }}>{b.bill_date}</p>
                                     </td>
-                                    <td className="px-4 py-4 text-center">
-                                        <span className={`px-4 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest ${
+                                    <td className="px-4 py-4 text-center hidden sm:table-cell">
+                                        <span className={`px-3 py-1 rounded-md border text-[9px] font-bold uppercase tracking-widest ${
                                             b.status === 'paid' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 
                                             'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
-                                            {b.status === 'paid' ? <CheckCircle2 className="w-3 h-3 inline mr-1" /> : <Clock className="w-3 h-3 inline mr-1" />}
                                             {b.status}
                                         </span>
                                     </td>
-                                    <td className="pr-10 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2">
+
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex items-center justify-end gap-1.5">
+                                            {b.status === 'pending' && user?.role === 'admin' && (
+                                                <button onClick={() => handleMarkPaid(b.id, b.invoice_number)} 
+                                                    title="Mark as Paid"
+                                                    className="p-1.5 rounded-lg border bg-[var(--luna-card)] border-amber-500/30 text-amber-500 hover:bg-amber-500/10 transition-all hover:-translate-y-0.5 shadow-sm">
+                                                    <CreditCard className="w-4 h-4" />
+                                                </button>
+                                            )}
                                             <button onClick={() => setDetailsModal({ open: true, item: b })} 
-                                                className="p-2.5 rounded-xl border transition-all hover:bg-blue-600 hover:text-white"
-                                                style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-navy)', color: 'var(--luna-text-main)' }}>
+                                                title="View Registry"
+                                                className="p-1.5 rounded-lg border bg-[var(--luna-card)] border-blue-500/30 text-blue-500 hover:bg-blue-500/10 transition-all hover:-translate-y-0.5 shadow-sm">
                                                 <Eye className="w-4 h-4" />
                                             </button>
                                             <button onClick={() => handleDownloadPDF(b.id, b.invoice_number)} 
-                                                className="p-2.5 rounded-xl border transition-all hover:bg-emerald-600 hover:text-white"
-                                                style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-navy)', color: '#10b981' }}>
+                                                title="Download PDF"
+                                                className="p-1.5 rounded-lg border bg-[var(--luna-card)] border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 transition-all hover:-translate-y-0.5 shadow-sm">
                                                 <Download className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </td>
+
                                 </tr>
                             ))}
                         </tbody>

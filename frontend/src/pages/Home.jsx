@@ -49,7 +49,7 @@ const StatNumber = ({ value, suffix = '', prefix = '' }) => {
 };
 
 const HeroStats = () => {
-    const [stats, setStats] = useState({ uptime: 99.9, hospitals: 0, patients_served: 0, ai_accuracy: 97 });
+    const [stats, setStats] = useState({ uptime: 99.9, hospitals: 0, patients_served: 0, accuracy: 99 });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -63,7 +63,7 @@ const HeroStats = () => {
         { label: 'System Uptime', value: stats.uptime, suffix: '%', sub: 'Reliability SLA', icon: <Activity className="w-6 h-6" /> },
         { label: 'Hospitals', value: stats.hospitals, suffix: '+', sub: 'Global Facilities', icon: <Globe className="w-6 h-6" /> },
         { label: 'Patients Served', value: stats.patients_served, suffix: '+', sub: 'Annually', icon: <HeartPulse className="w-6 h-6" /> },
-        { label: 'AI Accuracy', value: stats.ai_accuracy, suffix: '%', sub: 'Diagnostic Assist', icon: <BrainCircuit className="w-6 h-6" /> },
+        { label: 'Data Accuracy', value: stats.accuracy || 99.8, suffix: '%', sub: 'Clinical Integrity', icon: <CheckCircle className="w-6 h-6" /> },
     ];
 
     return (
@@ -112,9 +112,6 @@ const Home = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                         {/* Left */}
                         <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, ease: "easeOut" }}>
-                            <div className="section-tag mb-8 inline-flex px-4 py-2" style={{ background: 'var(--luna-navy)', color: 'var(--luna-blue)', borderColor: 'var(--luna-border)' }}>
-                                <Sparkles className="w-4 h-4" /> Professional Clinical OS v2.1
-                            </div>
 
                             <h1 className="text-3xl md:text-5xl font-black mb-6 leading-[1.15] tracking-tight" style={{ color: 'var(--luna-text-main)' }}>
                                 Lifeline Network <br />
@@ -124,7 +121,7 @@ const Home = () => {
                             <div className="w-24 h-1.5 rounded-full mb-10" style={{ background: `linear-gradient(90deg, ${LUNA.teal}, transparent)` }} />
 
                             <p className="text-lg mb-10 leading-relaxed max-w-xl font-bold" style={{ color: 'var(--luna-text-main)', opacity: 0.9 }}>
-                                A secure, AI-powered bridge between healthcare professionals and patient care.
+                                A secure, institutional bridge between healthcare professionals and patient care.
                             </p>
 
                             <div className="flex flex-wrap items-center gap-5 mb-20">
@@ -194,10 +191,10 @@ const FeaturesSection = () => {
 
     const features = [
         { icon: <ShieldCheck className="w-7 h-7" />, title: 'HIPAA Compliant', desc: 'Military-grade encryption and audited access controls protect every patient record at every layer.', color: LUNA.blue },
-        { icon: <Activity className="w-7 h-7" />, title: 'Real-Time Monitoring', desc: 'Live dashboards and AI alerts keep clinical staff informed of every critical change instantly.', color: LUNA.steel },
+        { icon: <Activity className="w-7 h-7" />, title: 'Real-Time Monitoring', desc: 'Live dashboards and clinical alerts keep staff informed of every critical change instantly.', color: LUNA.steel },
         { icon: <Users className="w-7 h-7" />, title: 'Role-Based Access', desc: 'Distinct, optimized environments for Administrators, Doctors, and Patients — all in one platform.', color: LUNA.teal },
         {
-            icon: <BrainCircuit className="w-7 h-7" />, title: 'AI Neural Core', desc: "Lifeline's AI assistant analyzes symptoms, suggests diagnoses, and optimizes appointments automatically.", color: '#6366f1'
+            icon: <Calendar className="w-7 h-7" />, title: 'Resource Manager', desc: "Lifeline's infrastructure optimizes shift scheduling, ward occupancy, and asset allocation.", color: '#6366f1'
         },
         { icon: <Globe className="w-7 h-7" />, title: 'Multilingual Support', desc: 'Available in 7 Indian languages: English, Hindi, Tamil, Telugu, Malayalam, Kannada, and Bengali.', color: '#059669' },
         { icon: <FileText className="w-7 h-7" />, title: 'Billing & Receipts', desc: 'Generate professional PDF invoices, discharge summaries, and payment receipts automatically.', color: '#d97706' },
@@ -208,9 +205,6 @@ const FeaturesSection = () => {
             <div className="max-w-7xl mx-auto px-6">
                 <motion.div initial={{ opacity: 0, y: 30 }} animate={inView ? { opacity: 1, y: 0 } : {}}
                     transition={{ duration: 0.6 }} className="text-center max-w-3xl mx-auto mb-12">
-                    <div className="section-tag mx-auto inline-flex mb-4">
-                        <Zap className="w-4 h-4" /> Core Capabilities
-                    </div>
                     <h2 className="text-4xl md:text-5xl font-extrabold mb-5" style={{ color: 'var(--luna-text-main)' }}>
                         Built for Clinical Excellence
                     </h2>
@@ -254,7 +248,7 @@ const ModulesSection = () => {
         { icon: <BarChart3 />, title: 'Admin Command', desc: 'Real-time analytics, revenue overview, and hospital-wide insights.', color: '#6366f1' },
         { icon: <Stethoscope />, title: "Medical Gateway", desc: 'Manage ward lists, view schedules, access records, and verify prescriptions.', color: LUNA.steel },
         { icon: <ShieldCheck />, title: "Zero-Trust Architecture", desc: 'Military grade encryption guarding electronic health records cross-departmentally.', color: LUNA.teal },
-        { icon: <Calendar />, title: 'Duty Rosters', desc: 'Smart shifts scheduling with AI optimization and conflict detection.', color: '#d97706' },
+        { icon: <Calendar />, title: 'Duty Rosters', desc: 'Smart shifts scheduling with automated conflict detection and ward balancing.', color: '#d97706' },
         { icon: <FileText />, title: 'Asset & Finance', desc: 'Internal auto-generation of inventory requisitions and payroll summaries.', color: '#059669' },
         { icon: <Bell />, title: 'Code Alerts', desc: 'Immediate paging, SMS, and in-app alerts for critical ER influx events.', color: '#ef4444' },
     ];
@@ -263,14 +257,11 @@ const ModulesSection = () => {
         <section ref={ref} className="py-16 bg-[var(--luna-bg)]">
             <div className="max-w-7xl mx-auto px-6">
                 <motion.div initial={{ opacity: 0, y: 30 }} animate={inView ? { opacity: 1, y: 0 } : {}} className="text-center max-w-3xl mx-auto mb-12">
-                    <div className="section-tag mx-auto inline-flex mb-4">
-                        <BarChart3 className="w-4 h-4" /> Platform Modules
-                    </div>
                     <h2 className="text-3xl md:text-5xl font-extrabold mb-6" style={{ color: 'var(--luna-text-main)' }}>
                         Everything Your Hospital Needs
                     </h2>
                     <p className="text-lg font-medium max-w-2xl mx-auto" style={{ color: 'var(--luna-text-muted)' }}>
-                        A complete medical operating system — from administration to AI diagnostics — in one unified platform.
+                        A complete medical operating system — from administration to diagnostics — in one unified platform.
                     </p>
                 </motion.div>
 
@@ -302,7 +293,7 @@ const TestimonialsSection = () => {
     const inView = useInView(ref, { once: true, margin: '-100px' });
 
     const reviews = [
-        { name: 'Dr. Priya Sharma', role: 'Chief of Cardiology, AIIMS Delhi', text: 'Lifeline transformed how we manage patient records and appointments. The AI diagnostic assistant is remarkable.', rating: 5 },
+        { name: 'Dr. Priya Sharma', role: 'Chief of Cardiology, AIIMS Delhi', text: 'Lifeline transformed how we manage patient records and appointments. The scheduling system is remarkable.', rating: 5 },
         { name: 'Dr. Rajesh Kumar', role: 'Director, Apollo Hospitals', text: 'The multilingual support was a game-changer for our diverse patient base. Tamil and Hindi support especially.', rating: 5 },
         { name: 'Admin. Kavitha N.', role: 'Hospital Administrator, Manipal', text: 'Revenue tracking, billing automation, and real-time dashboards have saved us hours of manual work every day.', rating: 5 },
     ];

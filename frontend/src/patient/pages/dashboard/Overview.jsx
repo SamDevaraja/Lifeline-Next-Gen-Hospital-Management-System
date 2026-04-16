@@ -6,7 +6,7 @@ import {
     FileText, Bell, DollarSign, Stethoscope, BrainCircuit,
     BarChart3, AlertCircle, CheckCircle, Clock, X, Menu,
     Video, Pill, FlaskConical, Smartphone, QrCode, User, Mic, ArrowRight, Sun, Moon, Globe, ChevronDown, Filter,
-    Mail, Lock
+    Mail, Lock, ShieldCheck
 } from 'lucide-react';
 import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Line } from 'recharts';
@@ -39,7 +39,7 @@ const DoctorOverview = ({ user }) => {
         try {
             const [res, apps] = await Promise.all([
                 api.get(`/dashboard/stats/`),
-                api.get(`/appointments/?doctor_id=${user.id}`)
+                api.get(`/appointments/?doctor_id=${user.doctor_id}`)
             ]);
             setStats({ ...res.data, myAppointments: apps.data.slice(0, 5) });
         } catch (err) { console.error(err); }
@@ -48,7 +48,7 @@ const DoctorOverview = ({ user }) => {
 
     useEffect(() => {
         fetchData();
-    }, [user.id]);
+    }, [user.doctor_id]);
 
     const handleStartCall = async (apptId, currentLink) => {
         if (!currentLink) {
@@ -83,7 +83,7 @@ const DoctorOverview = ({ user }) => {
                 {[
                     { label: 'My Patients', value: stats?.total_patients || 0, icon: <Users className="w-5 h-5" />, color: LUNA.teal },
                     { label: 'Today Sched', value: stats?.today_appointments || 0, icon: <Calendar className="w-5 h-5" />, color: '#6366f1' },
-                    { label: 'AI Review Ready', value: stats?.ai_diagnoses_today || 0, icon: <BrainCircuit className="w-5 h-5" />, color: '#f59e0b' },
+                    { label: 'Ward Occupancy', value: stats?.ward_occupancy || 'Optimal', icon: <Stethoscope className="w-5 h-5" />, color: '#f59e0b' },
                 ].map((s, i) => (
                     <div key={i} className="card-clinical p-6 flex flex-col justify-between group">
                         <div className="flex items-center justify-between mb-4">
@@ -141,201 +141,204 @@ const PatientOverview = ({ user }) => {
         const fetchData = async () => {
             try {
                 const [apps, bills] = await Promise.all([
-                    api.get(`/appointments/?patient_id=${user.id}`),
-                    api.get(`/bills/?patient_id=${user.id}`)
+                    api.get(`/appointments/?patient_id=${user.patient_id}`),
+                    api.get(`/bills/?patient_id=${user.patient_id}`)
                 ]);
                 setStats({ appointments: apps.data, bills: bills.data });
             } catch (err) { console.error(err); }
             finally { setLoading(false); }
         };
         fetchData();
-    }, [user.id]);
+    }, [user.patient_id]);
 
     const unpaidBills = stats?.bills?.filter(b => b.status === 'pending') || [];
     const nextApp = stats?.appointments?.find(a => a.status === 'confirmed');
 
-
-    const quickActions = [
-        { label: 'Book Consult', icon: <Plus className="w-4 h-4" />, path: '/patient/dashboard/appointments', color: 'text-blue-500 bg-blue-500/10' },
-        { label: 'My Records', icon: <FileText className="w-4 h-4" />, path: '/patient/dashboard/records', color: 'text-teal-500 bg-teal-500/10' },
-        { label: 'Lab Diagnostics', icon: <Activity className="w-4 h-4" />, path: '/patient/dashboard/lab', color: 'text-indigo-500 bg-indigo-500/10' },
-        { label: 'Pay Bills', icon: <DollarSign className="w-4 h-4" />, path: '/patient/dashboard/billing', color: 'text-emerald-500 bg-emerald-500/10' },
+    const statusBadges = [
+        { label: 'Health Status', value: 'Active', color: 'var(--luna-teal)' },
+        { label: 'Next Appointment', value: nextApp ? nextApp.appointment_date : 'None', color: 'var(--luna-blue)' },
+        { label: 'Due Amount', value: `₹${unpaidBills.reduce((acc, b) => acc + parseFloat(b.total_amount), 0).toLocaleString()}`, color: 'var(--luna-danger-text)' },
     ];
 
     return (
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="max-w-6xl mx-auto w-full pb-10 space-y-8">
-            {/* Header Area */}
-            <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4 border-b pb-6" style={{ borderColor: 'var(--luna-border)' }}>
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>
-                        Welcome back, {user.first_name || 'Patient'}
+        <div className="w-full max-w-7xl mx-auto space-y-10 pb-20 px-4">
+            {/* Header: CLEAN & MINIMAL (NOTIFICATION STYLE) */}
+            <header className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-12 pb-6 border-b" style={{ borderColor: 'var(--luna-border)' }}>
+                <div className="flex flex-col gap-1">
+                    <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>
+                        My Health Dashboard
                     </h1>
-                    <p className="font-bold text-sm mt-1" style={{ color: 'var(--luna-text-muted)' }}>
-                        Clinical Data Sync & Patient Hub
-                    </p>
-                </div>
-            </div>
-
-            {/* Top Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-6 rounded-2xl border shadow-sm flex flex-col justify-between" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                    <div className="flex items-center justify-between mb-8">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-teal-500 bg-teal-500/10">
-                            <Calendar className="w-5 h-5" />
-                        </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60" style={{ color: 'var(--luna-text-muted)' }}>Next Appt</span>
-                    </div>
-                    <div>
-                        <p className="text-2xl font-black tracking-tight truncate" style={{ color: 'var(--luna-text-main)' }}>{nextApp ? nextApp.appointment_date : 'None Scheduled'}</p>
-                        <p className="text-xs font-bold text-teal-500 mt-1">{nextApp ? nextApp.appointment_time : 'Clear calendar'}</p>
-                    </div>
-                </div>
-
-                <div className="p-6 rounded-2xl border shadow-sm flex flex-col justify-between" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                    <div className="flex items-center justify-between mb-8">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-rose-500 bg-rose-500/10">
-                            <DollarSign className="w-5 h-5" />
-                        </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60" style={{ color: 'var(--luna-text-muted)' }}>Due Balance</span>
-                    </div>
-                    <div>
-                        <p className="text-2xl font-black tracking-tight truncate" style={{ color: 'var(--luna-text-main)' }}>₹{unpaidBills.reduce((acc, b) => acc + parseFloat(b.total_amount), 0).toLocaleString()}</p>
-                        <p className="text-xs font-bold text-rose-500 mt-1">{unpaidBills.length} pending</p>
-                    </div>
-                </div>
-
-                <div className="p-6 rounded-2xl border shadow-sm flex flex-col justify-between" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                    <div className="flex items-center justify-between mb-8">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-indigo-500 bg-indigo-500/10">
-                            <Activity className="w-5 h-5" />
-                        </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60" style={{ color: 'var(--luna-text-muted)' }}>Quick Actions</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 mt-auto">
-                        {quickActions.map((action, i) => (
-                            <button
-                                key={i} onClick={() => navigate(action.path)}
-                                className="flex items-center gap-2 justify-center py-2 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all hover:bg-white/5"
-                                style={{ background: 'var(--luna-navy)', borderColor: 'var(--luna-border)', color: 'var(--luna-text-main)' }}
-                            >
-                                {action.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-            
-            {/* Clinical Vitals Pulse */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {[
-                    { label: 'Blood Pressure', value: '120/80', unit: 'mmHg', status: 'Optimal', icon: <Activity className="w-4 h-4" />, color: 'text-emerald-500' },
-                    { label: 'Heart Rate', value: '72', unit: 'BPM', status: 'Resting', icon: <HeartPulse className="w-4 h-4" />, color: 'text-rose-500' },
-                    { label: 'Oxygen Saturation', value: '98', unit: '%', status: 'Normal', icon: <Sparkles className="w-4 h-4" />, color: 'text-blue-500' },
-                    { label: 'Body Temp', value: '98.6', unit: '°F', status: 'Stable', icon: <TrendingUp className="w-4 h-4" />, color: 'text-orange-500' },
-                ].map((v, i) => (
-                    <div key={i} className="p-5 rounded-2xl border shadow-sm flex flex-col gap-3" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                        <div className="flex items-center justify-between">
-                            <div className={`p-2 rounded-lg bg-opacity-10 ${v.color.replace('text-', 'bg-')}`}>{v.icon}</div>
-                            <span className="text-[9px] font-black uppercase tracking-widest opacity-60" style={{ color: 'var(--luna-text-muted)' }}>{v.label}</span>
-                        </div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-xl font-black" style={{ color: 'var(--luna-text-main)' }}>{v.value}</span>
-                            <span className="text-[10px] font-bold opacity-60" style={{ color: 'var(--luna-text-muted)' }}>{v.unit}</span>
-                        </div>
+                    <div className="flex items-center gap-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">
+                            Patient ID: <span style={{ color: 'var(--luna-teal)' }}>LFLN-{user.patient_id?.toString().padStart(5, '0')}</span>
+                        </p>
                         <div className="flex items-center gap-1.5">
-                            <div className={`w-1.5 h-1.5 rounded-full ${v.color.replace('text-', 'bg-')} animate-pulse`} />
-                            <span className={`text-[9px] font-black uppercase tracking-widest ${v.color}`}>{v.status}</span>
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 animate-pulse" />
+                            <span className="text-[9px] font-black uppercase tracking-widest opacity-30">Live Connection Stable</span>
                         </div>
                     </div>
-                ))}
-            </div>
-
-            {/* Clinical Health Pulse Highlight */}
-            <div className="card-clinical relative overflow-hidden group cursor-pointer" 
-                 style={{ background: 'var(--luna-navy)', borderColor: 'var(--luna-border)' }}
-                 onClick={() => navigate('/patient/dashboard/records')}>
-                <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-teal-500/10 transition-colors" />
-                <div className="p-8 relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="flex items-center gap-6 text-center md:text-left flex-col md:flex-row">
-                        <div className="w-20 h-20 rounded-3xl flex items-center justify-center border-2 border-teal-500/20 bg-teal-500/5 text-teal-500 shadow-lg shadow-teal-500/10 transition-transform group-hover:scale-110">
-                            <FileText className="w-10 h-10" />
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>My Clinical Vault</h2>
-                            <p className="text-sm font-bold mt-1 max-w-md" style={{ color: 'var(--luna-text-muted)' }}>
-                                Access your entire diagnostic history, prescriptions, and specialist consultations through our secure encryption-first ledger.
-                            </p>
-                        </div>
-                    </div>
-                    <button className="btn-teal !px-8 !py-4 text-xs font-black uppercase tracking-widest whitespace-nowrap shadow-teal-500/20">
-                        Enter Health Vault <ArrowRight className="w-4 h-4 ml-2" />
-                    </button>
                 </div>
-            </div>
 
-            {/* Live Consultation Highlight */}
-            {stats?.appointments?.some(a => a.status === 'confirmed' || a.status === 'live') && (
-                <div className="card-clinical bg-emerald-500/5 border-emerald-500/20 p-6 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="flex items-center gap-5">
-                        <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                            <Video className="w-7 h-7" />
+                <div className="flex items-center gap-6">
+                    {statusBadges.map((s, i) => (
+                        <div key={i} className="flex flex-col items-end">
+                            <span className="text-[9px] font-black uppercase tracking-widest opacity-30">{s.label}</span>
+                            <span className="text-[11px] font-black uppercase tracking-wider font-mono" style={{ color: s.color }}>{s.value}</span>
                         </div>
-                        <div>
-                            <h2 className="text-xl font-black" style={{ color: 'var(--luna-text-main)' }}>Secure Clinical Bridge</h2>
-                            <p className="text-xs font-bold opacity-70" style={{ color: 'var(--luna-text-muted)' }}>Real-time virtual examination hub is active or pending.</p>
-                        </div>
-                    </div>
-                    <button 
-                        onClick={() => navigate('/patient/dashboard/telemedicine')}
-                        className="btn-teal !px-8 !py-3.5 text-[10px] font-black uppercase tracking-widest shadow-emerald-500/10"
-                    >
-                        Launch Virtual Terminal
-                    </button>
+                    ))}
                 </div>
-            )}
+            </header>
 
-            {/* Clinical Encounters Ledger */}
-            <div className="shadow-sm rounded-2xl overflow-hidden border flex flex-col" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
-                <div className="p-6 border-b flex items-center justify-between" style={{ borderColor: 'var(--luna-border)' }}>
-                    <h2 className="font-extrabold text-lg flex items-center gap-2" style={{ color: 'var(--luna-text-main)' }}>
-                        <FileText className="w-5 h-5 text-teal-500" /> Recent Encounters
+            {/* Main Content Feed */}
+            <main className="space-y-10">
+                {/* 1. Important Updates & Actions */}
+                <section className="space-y-4">
+                    <h2 className="text-[10px] font-black uppercase tracking-[0.25em] opacity-40 mb-6 flex items-center gap-2">
+                        <Bell className="w-3 h-3" /> Recent Updates & Actions
                     </h2>
-                    <Link to="/patient/dashboard/records" className="text-xs font-bold transition-colors px-4 py-2 rounded-lg border hover:bg-white/5" style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)', background: 'var(--luna-navy)' }}>View Archive</Link>
-                </div>
-                
-                <div className="flex-grow p-0 overflow-x-auto">
-                    {loading ? <div className="p-12 text-center text-sm font-bold opacity-60">Loading data...</div> :
-                        stats?.appointments?.length > 0 ? (
-                            <table className="w-full text-left border-collapse min-w-[500px]">
+                    
+                    <div className="space-y-px border rounded-2xl overflow-hidden shadow-2xl" 
+                         style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                        
+                        {/* Appointment Item */}
+                        <div onClick={() => navigate('/patient/dashboard/appointments')}
+                             className="group p-5 flex items-center justify-between border-b cursor-pointer transition-all hover:bg-white/[0.02]"
+                             style={{ borderColor: 'var(--luna-border)' }}>
+                            <div className="flex items-center gap-5">
+                                <div className="p-3 rounded-2xl bg-teal-500/10 text-teal-500 shadow-inner group-hover:scale-110 transition-transform">
+                                    <Calendar className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border border-teal-500/30 text-teal-500 bg-teal-500/5">Appointment</span>
+                                        <h3 className="text-sm font-bold" style={{ color: 'var(--luna-text-main)' }}>Upcoming Doctor Visit</h3>
+                                    </div>
+                                    <p className="text-xs font-bold opacity-60 max-w-md" style={{ color: 'var(--luna-text-muted)' }}>
+                                        {nextApp ? `Your visit with Dr. ${nextApp.doctor_name || nextApp.doctorName} is confirmed.` : 'No upcoming doctor visits scheduled.'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1.5 min-w-[120px]">
+                                <span className="text-[10px] font-black font-mono opacity-40">{nextApp?.appointment_date || 'N/A'}</span>
+                                <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-navy)', color: 'var(--luna-text-muted)' }}>View Details</span>
+                            </div>
+                        </div>
+
+                        {/* Financial Item */}
+                        <div onClick={() => navigate('/patient/dashboard/billing')}
+                             className="group p-5 flex items-center justify-between border-b cursor-pointer transition-all hover:bg-white/[0.02]"
+                             style={{ borderColor: 'var(--luna-border)' }}>
+                            <div className="flex items-center gap-5">
+                                <div className="p-3 rounded-2xl bg-rose-500/10 text-rose-500 shadow-inner group-hover:scale-110 transition-transform">
+                                    <DollarSign className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border border-rose-500/30 text-rose-500 bg-rose-500/5">Billing</span>
+                                        <h3 className="text-sm font-bold" style={{ color: 'var(--luna-text-main)' }}>Outstanding Bills</h3>
+                                    </div>
+                                    <p className="text-xs font-bold opacity-60 max-w-md" style={{ color: 'var(--luna-text-muted)' }}>
+                                        {unpaidBills.length > 0 ? `You have ${unpaidBills.length} unpaid medical bills.` : 'All your medical bills have been cleared.'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1.5 min-w-[120px]">
+                                <span className="text-[10px] font-black font-mono text-rose-500">₹{unpaidBills.reduce((acc, b) => acc + parseFloat(b.total_amount), 0).toLocaleString()}</span>
+                                <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-navy)', color: 'var(--luna-text-muted)' }}>Pay Now</span>
+                            </div>
+                        </div>
+
+                        {/* Telemedicine Item */}
+                        <div onClick={() => navigate('/patient/dashboard/telemedicine')}
+                             className="group p-5 flex items-center justify-between cursor-pointer transition-all hover:bg-white/[0.02]">
+                            <div className="flex items-center gap-5">
+                                <div className="p-3 rounded-2xl bg-indigo-500/10 text-indigo-500 shadow-inner group-hover:scale-110 transition-transform">
+                                    <Video className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border border-indigo-500/30 text-indigo-500 bg-indigo-500/5">Virtual Visit</span>
+                                        <h3 className="text-sm font-bold" style={{ color: 'var(--luna-text-main)' }}>Video Consultation</h3>
+                                    </div>
+                                    <p className="text-xs font-bold opacity-60 max-w-md" style={{ color: 'var(--luna-text-muted)' }}>
+                                        Connect with your doctor via secure video call.
+                                    </p>
+                                </div>
+                            </div>
+                            <button className="text-[9px] font-black uppercase tracking-widest px-5 py-2.5 rounded-xl border transition-all hover:bg-[var(--luna-blue)] hover:text-white" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-navy)', color: 'var(--luna-text-muted)' }}>Launch Call</button>
+                        </div>
+                    </div>
+                </section>
+
+                {/* 2. Medical Visit History (ENHANCED UI) */}
+                <section className="space-y-6 pt-4">
+                    <div className="flex items-center justify-between px-2">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-indigo-500/10 text-indigo-500">
+                                <FileText className="w-4 h-4" />
+                            </div>
+                            <h2 className="text-[11px] font-black uppercase tracking-[0.25em] opacity-50">
+                                Recent Medical History
+                            </h2>
+                        </div>
+                        <Link to="/patient/dashboard/records" 
+                              className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-all hover:bg-white/[0.05]"
+                              style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-dim)' }}>
+                            View Full Archive
+                        </Link>
+                    </div>
+                    
+                    <div className="shadow-2xl rounded-[2rem] overflow-hidden border" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="text-[10px] uppercase font-black tracking-widest" style={{ color: 'var(--luna-text-muted)', background: 'var(--luna-navy)' }}>
-                                        <th className="p-4 pl-6 border-b" style={{ borderColor: 'var(--luna-border)' }}>Date</th>
-                                        <th className="p-4 border-b" style={{ borderColor: 'var(--luna-border)' }}>Physician</th>
-                                        <th className="p-4 border-b" style={{ borderColor: 'var(--luna-border)' }}>Type</th>
-                                        <th className="p-4 text-right pr-6 border-b" style={{ borderColor: 'var(--luna-border)' }}>Status</th>
+                                    <tr className="text-[9px] uppercase font-black tracking-[0.25em]" 
+                                        style={{ color: 'var(--luna-text-muted)', background: 'var(--luna-navy)' }}>
+                                        <th className="p-6 pl-10 border-b" style={{ borderColor: 'var(--luna-border)' }}>Date & Time</th>
+                                        <th className="p-6 border-b" style={{ borderColor: 'var(--luna-border)' }}>Attending Doctor</th>
+                                        <th className="p-6 border-b" style={{ borderColor: 'var(--luna-border)' }}>Service Type</th>
+                                        <th className="p-6 text-right pr-10 border-b" style={{ borderColor: 'var(--luna-border)' }}>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {stats.appointments.slice(0, 5).map((a, i) => (
-                                        <tr key={i} className="transition-colors hover:bg-white/5" style={{ borderColor: 'var(--luna-border)' }}>
-                                            <td className="p-4 pl-6 text-sm font-bold border-b" style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}>{a.appointment_date}</td>
-                                            <td className="p-4 text-sm font-black border-b" style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}>{a.doctor_name || `Dr. ${a.doctorName || a.doctor}`}</td>
-                                            <td className="p-4 border-b" style={{ borderColor: 'var(--luna-border)' }}>
-                                                <span className="text-[10px] font-black uppercase tracking-widest opacity-80 border px-2 py-0.5 rounded text-indigo-500 bg-indigo-500/10" style={{ borderColor: 'var(--luna-border)' }}>Consultation</span>
+                                    {(stats?.appointments || []).slice(0, 4).map((a, i) => (
+                                        <tr key={i} className="group transition-all hover:bg-white/[0.01]" style={{ borderColor: 'var(--luna-border)' }}>
+                                            <td className="p-6 pl-10 border-b group-last:border-none" style={{ borderColor: 'var(--luna-border)' }}>
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-8 h-8 rounded-lg border flex items-center justify-center bg-white/[0.02] opacity-40 group-hover:opacity-100 transition-opacity" style={{ borderColor: 'var(--luna-border)' }}>
+                                                        <Activity className="w-3.5 h-3.5" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[11px] font-black font-mono leading-none" style={{ color: 'var(--luna-text-main)' }}>{a.appointment_date}</p>
+                                                        <p className="text-[9px] font-bold opacity-30 uppercase mt-1 tracking-wider">{a.appointment_time || 'General Session'}</p>
+                                                    </div>
+                                                </div>
                                             </td>
-                                            <td className="p-4 pr-6 text-right border-b" style={{ borderColor: 'var(--luna-border)' }}>
-                                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md border" style={{ color: a.status === 'confirmed' ? 'var(--luna-success-text)' : 'var(--luna-info-text)', borderColor: 'var(--luna-border)' }}>{a.status}</span>
+                                            <td className="p-6 border-b group-last:border-none" style={{ borderColor: 'var(--luna-border)' }}>
+                                                <p className="text-xs font-black uppercase tracking-tight" style={{ color: 'var(--luna-text-main)' }}>
+                                                    {a.doctor_name || `DR. ${a.doctorName || 'UNASSIGNED'}`}
+                                                </p>
+                                                <p className="text-[9px] font-bold opacity-30 uppercase mt-1 tracking-wider">Medical Consultant</p>
+                                            </td>
+                                            <td className="p-6 border-b group-last:border-none" style={{ borderColor: 'var(--luna-border)' }}>
+                                                <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-md border bg-indigo-500/5 text-indigo-400" style={{ borderColor: 'var(--luna-border)' }}>
+                                                    Examination
+                                                </span>
+                                            </td>
+                                            <td className="p-6 pr-10 text-right border-b group-last:border-none" style={{ borderColor: 'var(--luna-border)' }}>
+                                                <span className={`text-[8px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border ${a.status === 'confirmed' ? 'text-teal-500 bg-teal-500/5 border-teal-500/30' : 'text-amber-500 bg-amber-500/5 border-amber-500/30'}`}>
+                                                    {a.status}
+                                                </span>
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
-                        ) : <div className="p-16 flex flex-col items-center justify-center opacity-70"><CheckCircle className="w-12 h-12 mb-3 text-emerald-500" /><div className="text-sm font-bold" style={{ color: 'var(--luna-text-muted)' }}>No medical encounters recorded.</div></div>
-                    }
-                </div>
-            </div>
-        </motion.div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
     );
 };
 
@@ -421,8 +424,8 @@ const AdminOverview = () => {
 
                 <div className="card shadow-sm" style={{ border: '1px solid var(--luna-border)', background: 'var(--luna-card)' }}>
                     <Activity className="w-16 h-16 text-blue-400 opacity-20 mb-4" />
-                    <h2 className="text-lg font-bold" style={{ color: 'var(--luna-text-main)' }}>Clinical Intelligence</h2>
-                    <p className="text-sm mt-3 leading-relaxed max-w-xs uppercase tracking-wider opacity-50" style={{ color: 'var(--luna-text-muted)' }}>Real-time diagnostic synchronization active.</p>
+                    <h2 className="text-lg font-bold" style={{ color: 'var(--luna-text-main)' }}>Clinical Operations</h2>
+                    <p className="text-sm mt-3 leading-relaxed max-w-xs uppercase tracking-wider opacity-50" style={{ color: 'var(--luna-text-muted)' }}>Real-time institutional resource monitoring active.</p>
                 </div>
             </div>
         </motion.div>

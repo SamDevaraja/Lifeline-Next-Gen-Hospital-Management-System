@@ -83,8 +83,7 @@ export const PrivacyPolicy = () => {
                                 'Processing medical appointments, billing, prescriptions, and health record management.',
                                 'Communicating with you about your account, appointments, and important health updates.',
                                 'Ensuring the security and integrity of our platform against unauthorised access.',
-                                'Complying with applicable legal obligations under Indian healthcare regulations.',
-                                'AI-powered clinical assistance, diagnostic support, and personalised health recommendations.',
+                                'Complying with applicable legal obligations under local healthcare regulations.',
                             ].map((item, i) => (
                                 <li key={i} className="flex items-start gap-2">
                                     <ChevronRight className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--luna-teal)' }} />
@@ -230,7 +229,7 @@ export const TermsOfService = () => {
                                 'Accessing, tampering with, or using non-public areas of the platform without authorisation.',
                                 'Uploading false, misleading, or fraudulent patient or medical data.',
                                 'Attempting to probe, scan, or test the system for vulnerabilities or bypass security measures.',
-                                'Using the AI diagnostic tools as a substitute for professional medical judgement in critical care.',
+                                'Using the platform as a substitute for professional medical judgement in critical care.',
                                 'Reproducing, distributing, or creating derivative works from any platform content without written consent.',
                                 'Engaging in any activity that disrupts or interferes with the platform\'s performance or other users.',
                             ].map((item, i) => (
@@ -247,7 +246,7 @@ export const TermsOfService = () => {
                         <ul className="space-y-2 list-none">
                             {[
                                 'Any indirect, incidental, special, consequential, or punitive damages arising from use of the Service.',
-                                'Clinical decisions made by healthcare providers that rely solely on AI-generated recommendations.',
+                                'Clinical decisions made by healthcare providers that rely on platform-generated summaries.',
                                 'Loss of data, revenue, or profits resulting from service interruptions or technical failures.',
                                 'Actions taken by third-party integrations or API partners connected to the platform.',
                                 'Any unauthorised access to or use of our servers and any personal information stored therein.',

@@ -33,8 +33,8 @@ const LabPage = ({ user }) => {
             setLoading(true);
             try {
                 let url = 'lab-tests/';
-                if (user?.role === 'doctor') url += `?doctor_id=${user.id}`;
-                if (user?.role === 'patient') url += `?patient_id=${user.id}`;
+                if (user?.role === 'doctor') url += `?doctor_id=${user.doctor_id}`;
+                if (user?.role === 'patient') url += `?patient_id=${user.patient_id}`;
                 const res = await api.get(url);
                 setTests(res.data);
             } catch (err) {
@@ -94,14 +94,21 @@ const LabPage = ({ user }) => {
                                     <div className="flex-1 min-w-0">
                                         <p className="font-extrabold text-base mb-1" style={{ color: 'var(--luna-text-main)' }}><span className="text-rose-500 mr-2">{t.test_name}:</span>{t.result_value} <span className="text-xs opacity-70" style={{ color: 'var(--luna-text-muted)' }}>{t.unit}</span></p>
                                         <p className="text-xs font-bold mb-2" style={{ color: 'var(--luna-text-muted)' }}>Patient: {t.patient_name} • Ref: {t.reference_range}</p>
-                                        {t.ai_flag_reason && <p className="text-xs p-2 rounded-lg font-bold border" style={{ background: 'var(--luna-warn-bg)', color: 'var(--luna-warn-text)', borderColor: 'var(--luna-border)' }}>{t.ai_flag_reason}</p>}
+                                        {t.notes && <p className="text-xs p-2 rounded-lg font-bold border" style={{ background: 'var(--luna-navy)', color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}>{t.notes}</p>}
                                     </div>
                                     <button onClick={() => setDetailsModal({ open: true, item: t })} className="text-xs font-bold px-4 py-2 rounded-lg transition-all flex-shrink-0 border hover:bg-white/5" style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>Review</button>
                                 </motion.div>
-                            )) : <div className="flex-grow flex flex-col items-center justify-center opacity-80 p-6 border-2 border-dashed rounded-xl mt-4" style={{ borderColor: 'var(--luna-border)' }}>
-                                <CheckCircle className="w-10 h-10 mb-3" style={{ color: 'var(--luna-text-muted)' }} />
-                                <p className="text-sm font-bold" style={{ color: 'var(--luna-text-muted)' }}>No abnormal detections found.</p>
-                            </div>}
+                            )) : (
+                                <div className="flex-grow flex flex-col items-center justify-center p-6 text-center" style={{ color: 'var(--luna-text-main)' }}>
+                                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-3 border border-white/5 opacity-20">
+                                        <Search className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-sm font-bold tracking-[0.2em] opacity-40 uppercase mb-1">No Detections</h3>
+                                    <p className="text-[10px] font-semibold opacity-30 max-w-[200px] leading-relaxed">
+                                        All laboratory values currently match standard clinical ranges.
+                                    </p>
+                                </div>
+                            )}
                     </div>
                 </div>
 
@@ -126,9 +133,17 @@ const LabPage = ({ user }) => {
                                         {t.is_abnormal ? <span className="text-[9px] font-black tracking-widest px-2.5 py-1 rounded-full shadow-sm" style={{ background: LUNA.danger_bg, color: LUNA.danger_text, border: `1px solid ${LUNA.danger_text}` }}>HIGH RISK</span> : <span className="text-[9px] font-black tracking-widest px-2.5 py-1 rounded-full shadow-sm bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">OPTIMAL</span>}
                                     </div>
                                 </motion.div>
-                            )) : <div className="flex-grow flex flex-col items-center justify-center opacity-80 p-6 border-2 border-dashed rounded-xl mt-4" style={{ borderColor: 'var(--luna-border)' }}>
-                                    <p className="text-sm font-bold" style={{ color: 'var(--luna-text-muted)' }}>No recent investigations.</p>
-                                 </div>}
+                            )) : (
+                                <div className="flex-grow flex flex-col items-center justify-center p-6 text-center" style={{ color: 'var(--luna-text-main)' }}>
+                                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-3 border border-white/5 opacity-20">
+                                        <Search className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-sm font-bold tracking-[0.2em] opacity-40 uppercase mb-1">No Activity</h3>
+                                    <p className="text-[10px] font-semibold opacity-30 max-w-[200px] leading-relaxed">
+                                        No recent diagnostic events identified within your profile.
+                                    </p>
+                                </div>
+                            )}
                     </div>
                     <button onClick={() => navigate('/dashboard/records')} className="w-full mt-6 text-xs font-bold px-4 py-3 rounded-xl border transition-all hover:bg-white/5 flex items-center justify-center gap-2" style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)', background: 'var(--luna-navy)' }}>
                         <ArrowRight className="w-4 h-4 text-teal-500" /> Go to Archive Explorer
@@ -139,6 +154,6 @@ const LabPage = ({ user }) => {
     );
 };
 
-// ── AI Hub Logic & Data ──
+
 
 export default LabPage;
