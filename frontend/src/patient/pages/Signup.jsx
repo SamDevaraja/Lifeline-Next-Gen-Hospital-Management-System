@@ -110,7 +110,7 @@ const Signup = () => {
 
     return (
         <div className="min-h-screen pt-20 md:pt-32 pb-10 md:pb-20 flex items-start justify-center px-4 md:px-6" style={{ background: 'var(--luna-bg)' }}>
-            <Toaster position="top-right" toastOptions={{ style: { borderRadius: '12px', fontWeight: 600 } }} />
+            <Toaster position="top-right" toastOptions={{ duration: 3000, style: { borderRadius: '12px', fontWeight: 600 } }} />
 
             <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
                 className="w-full max-w-2xl border rounded-[1.75rem] md:rounded-[2.5rem] p-5 md:p-12 shadow-2xl"

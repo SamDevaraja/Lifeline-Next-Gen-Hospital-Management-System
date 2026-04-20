@@ -229,7 +229,7 @@ const Dashboard = () => {
                     : 'radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.03) 0px, var(--luna-bg) 100%)',
                  color: 'var(--luna-text-main)' 
              }}>
-            <Toaster position="top-right" toastOptions={{ style: { borderRadius: '12px', fontWeight: 600, fontSize: '14px' } }} />
+            <Toaster position="top-right" toastOptions={{ duration: 3000, style: { borderRadius: '12px', fontWeight: 600, fontSize: '14px' } }} />
             {/* Sidebar */}
             <>
                 {/* Mobile overlay */}

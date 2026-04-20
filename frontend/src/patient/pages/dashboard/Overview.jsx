@@ -174,7 +174,7 @@ const PatientOverview = ({ user }) => {
 
     return (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-            <Toaster position="top-right" />
+            <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
             
             {/* Institutional Header */}
             <header className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">

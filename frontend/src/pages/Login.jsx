@@ -98,7 +98,7 @@ const Login = () => {
 
     return (
         <div className="h-screen flex overflow-hidden pt-20" style={{ background: 'var(--luna-bg)' }}>
-            <Toaster position="top-right" toastOptions={{ style: { borderRadius: '12px', fontWeight: 600 } }} />
+            <Toaster position="top-right" toastOptions={{ duration: 3000, style: { borderRadius: '12px', fontWeight: 600 } }} />
 
             {/* Left Panel - Symmetry Optimized */}
             <div className="hidden lg:flex flex-col justify-center flex-1 px-20 relative overflow-hidden"

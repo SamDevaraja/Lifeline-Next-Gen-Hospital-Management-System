@@ -115,6 +115,16 @@ class Appointment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        """Clinical Data Coupling: Sync denormalized telemetry with foreign key entities."""
+        if self.patient:
+            self.patientId = self.patient.id
+            self.patientName = self.patient.get_name
+        if self.doctor:
+            self.doctorId = self.doctor.id
+            self.doctorName = self.doctor.get_name
+        super().save(*args, **kwargs)
+
     class Meta:
         db_table = 'appointments'
         ordering = ['appointment_date', 'appointment_time']
@@ -340,12 +350,22 @@ from django.dispatch import receiver
 
 @receiver(post_save, sender=Appointment)
 def notify_appointment(sender, instance, created, **kwargs):
+    time_str = instance.appointment_time.strftime('%H:%M') if hasattr(instance.appointment_time, 'strftime') else str(instance.appointment_time)
     if created:
-        time_str = instance.appointment_time.strftime('%H:%M') if hasattr(instance.appointment_time, 'strftime') else str(instance.appointment_time)
         if instance.doctor and getattr(instance.doctor, 'user', None):
             Notification.objects.create(user=instance.doctor.user, title="New Clinical Appointment", message=f"Patient {instance.patientName} scheduled a consultation on {instance.appointment_date} at {time_str}.", notification_type="appointment")
         if instance.patient and getattr(instance.patient, 'user', None):
             Notification.objects.create(user=instance.patient.user, title="Appointment Request Confirmed", message=f"Your appointment with Dr. {instance.doctor.get_name} is locked in for {instance.appointment_date} at {time_str}.", notification_type="appointment")
+    else:
+        # Status Update Notification Protocol
+        if instance.patient and getattr(instance.patient, 'user', None):
+            title = "Clinical Status Update"
+            msg = f"Your appointment on {instance.appointment_date} has been updated to '{instance.status.upper()}'."
+            if instance.status == 'cancelled':
+                title = "Appointment Cancelled"
+            elif instance.status == 'rescheduled':
+                title = "Cycle Rescheduled"
+            Notification.objects.create(user=instance.patient.user, title=title, message=msg, notification_type="appointment")
 
 @receiver(post_save, sender=TeleConsultationSession)
 def notify_tele_session(sender, instance, created, **kwargs):
@@ -391,6 +411,32 @@ def notify_prescription(sender, instance, created, **kwargs):
     if created:
         if instance.patient and getattr(instance.patient, 'user', None):
             Notification.objects.create(user=instance.patient.user, title="New Clinical Prescription", message=f"Dr. {instance.doctor.get_name} has authorized a new medicinal prescription.", notification_type="system")
+
+@receiver(post_save, sender=Patient)
+def notify_patient_registration(sender, instance, created, **kwargs):
+    if created:
+        # Notify admins of new institutional registration
+        admins = User.objects.filter(is_superuser=True) | User.objects.filter(profile__role='admin')
+        for admin in admins.distinct():
+            Notification.objects.create(
+                user=admin, 
+                title="New Patient Registration", 
+                message=f"New clinical identity established: {instance.get_name}. Institutional approval required.", 
+                notification_type="system"
+            )
+
+@receiver(post_save, sender=SupportMessage)
+def notify_support_message(sender, instance, created, **kwargs):
+    if created:
+        # Notify admins of incoming institutional inquiry
+        receptionists = User.objects.filter(profile__role='receptionist') | User.objects.filter(is_superuser=True)
+        for staff in receptionists.distinct():
+            Notification.objects.create(
+                user=staff, 
+                title="New Incoming Message", 
+                message=f"Inquiry from {instance.name} regarding '{instance.subject[:20]}...' received.", 
+                notification_type="message"
+            )
         
 
 
