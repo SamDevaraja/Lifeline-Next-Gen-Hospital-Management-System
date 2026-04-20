@@ -152,6 +152,21 @@ const LabPage = ({ user }) => {
                 ]}
             />
 
+            {/* Institutional Stats Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                    { label: 'Total Analytics', value: filteredTests.length, color: '#1e3a8a' },
+                    { label: 'Pending Review', value: filteredTests.filter(t => !t.is_abnormal).length, color: '#f59e0b' },
+                    { label: 'Critical Flags', value: abnormalCount, color: '#ef4444' },
+                    { label: 'Sync Status', value: 'LIVE', color: '#4338ca' },
+                ].map((s, i) => (
+                    <div key={i} className="p-4 border rounded-xl" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-1" style={{ fontFamily: "'Inter', sans-serif" }}>{s.label}</p>
+                        <p className="text-2xl font-extrabold" style={{ color: s.color, fontFamily: "'Inter', sans-serif" }}>{loading ? '...' : s.value}</p>
+                    </div>
+                ))}
+            </div>
+
             <div className="flex-1 flex gap-6 overflow-hidden min-h-0">
                 
 
@@ -266,9 +281,9 @@ const LabPage = ({ user }) => {
                                                 </td>
                                                 <td className="px-6 py-4 text-center whitespace-nowrap">
                                                     {t?.is_abnormal ? (
-                                                        <span className="inline-block px-3 py-1 bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-lg border border-red-500/20 shadow-sm">Critical</span>
+                                                        <span className="inline-block px-3 py-1 bg-red-500/10 text-red-500 text-[9px] font-bold uppercase tracking-[0.05em] rounded-lg border border-red-500/20 shadow-sm" style={{ fontFamily: "'Inter', sans-serif" }}>Critical</span>
                                                     ) : (
-                                                        <span className="inline-block px-3 py-1 bg-green-500/10 text-green-500 text-[10px] font-black uppercase tracking-widest rounded-lg border border-green-500/20 shadow-sm">Nominal</span>
+                                                        <span className="inline-block px-3 py-1 bg-green-500/10 text-green-500 text-[9px] font-bold uppercase tracking-[0.05em] rounded-lg border border-green-500/20 shadow-sm" style={{ fontFamily: "'Inter', sans-serif" }}>Nominal</span>
                                                     )}
                                                 </td>
                                             </motion.tr>

@@ -14,6 +14,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { LANGUAGES } from '../i18n/index.js';
+import SearchModal from '../components/SearchModal';
 
 const LUNA = {
     sky: 'var(--luna-primary)',
@@ -130,14 +131,34 @@ const Dashboard = () => {
     const langRef = useRef(null);
     const currentLang = LANGUAGES.find(l => l.code === i18n.language) || LANGUAGES[0];
     const [unreadCount, setUnreadCount] = useState(0);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+        return () => clearInterval(timer);
+    }, []);
 
     useEffect(() => {
         if (user?.role) {
             document.documentElement.setAttribute('data-role', user.role.toLowerCase());
+            // Fetch real notification count
+            api.get('notifications/count/').then(res => setUnreadCount(res.data.count || 0)).catch(() => setUnreadCount(0));
         } else {
             document.documentElement.setAttribute('data-role', 'admin');
         }
     }, [user]);
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                setIsSearchOpen(true);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     const fetchNotificationsGlobally = async () => {
         if (!localStorage.getItem('token')) return;
@@ -254,37 +275,45 @@ const Dashboard = () => {
         ? location.pathname === item.to
         : location.pathname.startsWith(item.to) && item.to !== '/dashboard';
     return (
-        <div data-role={user?.role?.toLowerCase() || 'admin'} className="flex min-h-screen" style={{ background: 'var(--luna-bg)' }}>
+        <div data-role={user?.role?.toLowerCase() || 'admin'} className="flex h-[100dvh] w-full overflow-hidden transition-all duration-700 fixed inset-0" 
+             style={{ 
+                 background: theme === 'dark' 
+                    ? 'radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.1) 0px, var(--luna-bg) 100%)' 
+                    : 'radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.03) 0px, var(--luna-bg) 100%)',
+                 color: 'var(--luna-text-main)' 
+             }}>
             <Toaster position="top-right" toastOptions={{ style: { borderRadius: '12px', fontWeight: 600, fontSize: '14px' } }} />
 
             {/* Sidebar */}
             {user?.role?.toLowerCase() !== 'pharmacist' && (
                 <div className="flex">
                     {/* Mobile overlay */}
-                    {sidebarOpen && <div className="fixed inset-0 z-30 md:hidden bg-black bg-opacity-50" onClick={() => setSidebarOpen(false)} />}
+                    {sidebarOpen && <div className="fixed inset-0 z-30 md:hidden bg-black/60 backdrop-blur-sm transition-all" onClick={() => setSidebarOpen(false)} />}
 
-                <aside className={`fixed left-0 top-0 h-screen w-64 xl:w-72 flex flex-col z-40 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+                <aside className={`fixed left-0 top-0 h-full w-64 xl:w-72 flex flex-col z-40 transition-transform duration-500 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
                     style={{
                         background: 'var(--luna-card)',
                         borderRight: '1px solid var(--luna-border)',
-                        boxShadow: '10px 0 50px rgba(0,0,0,0.02)'
+                        boxShadow: '10px 0 50px rgba(0,0,0,0.05)'
                     }}>
 
-                    {/* Logo Section - Detached Aesthetic */}
-                    <div className="pt-8 pb-6 flex items-center justify-between px-6 shrink-0" style={{ borderBottom: '1px solid var(--luna-border)' }}>
+                    <div className="h-[100px] flex items-center justify-between px-6 shrink-0 border-b" style={{ borderColor: 'var(--luna-border)' }}>
                         <div className="flex items-center gap-3">
                             <div className="p-0.5 rounded-2xl" style={{ background: 'rgba(30, 58, 138, 0.03)' }}>
                                 <img src={logo} alt="Lifeline" className="w-9 h-9 object-contain drop-shadow-md" />
                             </div>
-                            <div>
-                                <p className="font-black text-[1.35rem] uppercase tracking-tighter" style={{ color: 'var(--luna-text-main)' }}>
+                            <div className="flex flex-col">
+                                <p className="font-black text-[1.35rem] uppercase tracking-tighter leading-none whitespace-nowrap" style={{ color: 'var(--luna-text-main)' }}>
                                     Lifeline <span style={{ color: 'var(--luna-blue)' }}>HMS</span>
                                 </p>
-                                <p className="text-[8.5px] uppercase font-black tracking-[0.12em] opacity-40 mt-0.5" style={{ color: 'var(--luna-text-main)' }}>Clinical Command Center</p>
+                                <p className="text-[8.5px] uppercase font-black tracking-[0.12em] opacity-40 mt-1.5" style={{ color: 'var(--luna-text-main)' }}>Clinical Command Center</p>
                             </div>
                         </div>
-                        <button className="md:hidden p-1" style={{ color: 'var(--luna-primary)' }} onClick={() => setSidebarOpen(false)}>
-                            <X className="w-4 h-4" />
+                        <button 
+                            onClick={() => setSidebarOpen(false)} 
+                            className="md:hidden p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-all active:scale-95 flex items-center justify-center"
+                        >
+                            <X className="w-4 h-4 opacity-40" />
                         </button>
                     </div>
                     {/* User Profile Card - EXECUTIVE PROFILE EDITION */}
@@ -421,95 +450,174 @@ const Dashboard = () => {
             )}
             {/* Main */}
             <div className={`flex-grow flex flex-col h-screen overflow-hidden ${user?.role?.toLowerCase() !== 'pharmacist' ? 'md:ml-64 xl:ml-72' : ''}`}>
-                {/* Topbar - Floating Institutional Pill */}
-                <header className="mt-4 mx-6 rounded-2xl border flex items-center justify-between px-6 sticky top-4 z-30 shrink-0 h-16"
+                {/* Topbar - Integrated Institutional Header */}
+                <header className="px-8 sticky top-0 z-30 shrink-0 h-16 border-b transition-all duration-300"
                     style={{
                         background: 'var(--luna-nav-bg)',
-                        backdropFilter: 'blur(24px)',
+                        backdropFilter: 'blur(16px)',
                         borderColor: 'var(--luna-border)',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.04)'
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                     }}>
                     
                     {user?.role?.toLowerCase() === 'pharmacist' ? (
                         <div className="flex items-center justify-between w-full h-full gap-4">
-                            <div className="flex-1 flex items-center justify-start min-w-0">
-                                <div className="flex items-center gap-3 pr-4 sm:pr-10 border-r border-dashed shrink-0" style={{ borderColor: 'var(--luna-border)' }}>
-                                    <div className="p-0.5 rounded-lg shrink-0" style={{ background: 'rgba(30, 58, 138, 0.05)' }}>
-                                        <img src={logo} alt="Lifeline" className="w-8 h-8 object-contain" />
-                                    </div>
-                                    <div className="hidden sm:block">
-                                        <div className="flex flex-col">
-                                            <p className="font-black text-base uppercase tracking-tighter leading-none" style={{ color: 'var(--luna-text-main)' }}>
-                                                LIFELINE <span style={{ color: 'var(--luna-blue)' }}>HMS</span>
-                                            </p>
-                                            <p className="font-bold text-[10px] uppercase tracking-[0.2em] opacity-40 mt-1" style={{ color: 'var(--luna-text-main)' }}>
-                                                Pharmacy Portal
-                                            </p>
-                                        </div>
+                            <div className="flex items-center gap-4 pr-10 border-r shrink-0" style={{ borderColor: 'var(--luna-border)' }}>
+                                <div className="p-1 rounded-xl shrink-0" style={{ background: 'rgba(30, 58, 138, 0.03)' }}>
+                                    <img src={logo} alt="Lifeline" className="w-9 h-9 object-contain drop-shadow-md" />
+                                </div>
+                                <div className="flex flex-col">
+                                    <p className="font-black text-sm uppercase tracking-tighter leading-none" style={{ color: 'var(--luna-text-main)' }}>
+                                        LIFELINE <span style={{ color: 'var(--luna-blue)' }}>HMS</span>
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        <p className="font-black text-[8px] uppercase tracking-[0.2em] opacity-40" style={{ color: 'var(--luna-text-main)' }}>
+                                            Pharmacy Terminal
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div className="flex-1 flex justify-center min-w-0">
-                                <nav className="flex items-center gap-2 sm:gap-4 overflow-x-auto no-scrollbar scroll-smooth">
-                                    {[
-                                        { to: '/dashboard/dispensary', label: 'Dispensary', icon: <Archive className="w-4 h-4"/> },
-                                        { to: '/dashboard/pharmacy', label: 'Inventory', icon: <Pill className="w-4 h-4"/> },
-                                        { to: '/dashboard/lab', label: 'Labs', icon: <FlaskConical className="w-4 h-4"/> }
-                                    ].map(link => {
-                                        const active = location.pathname.startsWith(link.to);
-                                        return (
-                                            <Link key={link.to} to={link.to} className={`flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${active ? 'shadow-sm border' : 'opacity-50 hover:opacity-100'}`}
-                                                style={active ? { background: 'var(--luna-info-bg)', color: 'var(--luna-teal)', borderColor: 'var(--luna-teal)' } : { color: 'var(--luna-text-main)' }}>
-                                                {link.icon} <span>{link.label}</span>
-                                            </Link>
-                                        );
-                                    })}
-                                </nav>
-                            </div>
+                            <nav className="flex items-center gap-2">
+                                {[
+                                    { to: '/dashboard/dispensary', label: 'Dispensary', icon: <Archive className="w-4 h-4"/> },
+                                    { to: '/dashboard/pharmacy', label: 'Inventory', icon: <Pill className="w-4 h-4"/> },
+                                    { to: '/dashboard/lab', label: 'Labs', icon: <FlaskConical className="w-4 h-4"/> },
+                                    { to: '/dashboard/settings', label: 'Profile', icon: <Settings className="w-4 h-4"/> }
+                                ].map(link => {
+                                    const active = location.pathname.startsWith(link.to);
+                                    return (
+                                        <Link key={link.to} to={link.to} className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all border ${active ? 'bg-[var(--luna-info-bg)] text-[var(--luna-teal)]' : 'opacity-40 hover:opacity-100 hover:bg-white/5 opacity-40'}`}
+                                            style={{ 
+                                                borderColor: active ? 'var(--luna-teal)' : 'transparent',
+                                                color: active ? 'var(--luna-teal)' : 'var(--luna-text-main)'
+                                            }}>
+                                            <div className={`${active ? 'opacity-100' : 'opacity-40'}`}>{link.icon}</div>
+                                            <span>{link.label}</span>
+                                        </Link>
+                                    );
+                                })}
+                            </nav>
                             
-                            <div className="flex-1 flex items-center justify-end gap-3 shrink-0">
-                                <button onClick={toggleTheme} className="w-10 h-10 rounded-xl flex items-center justify-center transition-all border shrink-0" style={{ color: 'var(--luna-teal)', borderColor: 'var(--luna-border)' }}>
-                                    {theme === 'dark' ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
+                            <div className="flex items-center gap-3 shrink-0">
+                                <div className="hidden xl:flex flex-col items-end mr-2">
+                                    <p className="text-[10px] font-black uppercase tracking-widest leading-none" style={{ color: 'var(--luna-text-main)' }}>{user?.first_name || 'Pharmacist'}</p>
+                                    <p className="text-[7px] font-black uppercase tracking-[0.2em] opacity-30 mt-1">Institutional Dispenser</p>
+                                </div>
+
+                                <button onClick={toggleTheme} className="w-10 h-10 rounded-xl flex items-center justify-center transition-all border hover:bg-white/5" style={{ color: 'var(--luna-teal)', borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
+                                    {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                                 </button>
-                                <Link to="/dashboard/notifications" className="w-10 h-10 rounded-xl flex items-center justify-center transition-all border shrink-0 relative" style={{ color: 'var(--luna-teal)', borderColor: 'var(--luna-border)' }}>
-                                    <BellRing className="w-4.5 h-4.5" />
-                                    {unreadCount > 0 && <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 border-2" style={{ borderColor: 'var(--luna-nav-bg)' }} />}
+                                
+                                <Link to="/dashboard/notifications" className="w-10 h-10 rounded-xl flex items-center justify-center transition-all border relative hover:bg-white/5" style={{ color: 'var(--luna-text-dim)', borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
+                                    <BellRing className="w-4 h-4 opacity-70" />
+                                    {unreadCount > 0 && <span className="absolute -top-1 -right-1 min-w-[16px] h-16px px-1 bg-red-600 text-white rounded-md text-[7px] font-black flex items-center justify-center border-2" style={{ borderColor: 'var(--luna-bg)' }}>{unreadCount}</span>}
                                 </Link>
-                                <button onClick={handleLogout} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl transition-all bg-red-600 shrink-0">
-                                    <LogOut className="w-4 h-4" /> <span className="hidden xl:inline">Sign Out</span>
+
+                                <div className="h-8 w-[1px] mx-1 opacity-10" style={{ background: 'var(--luna-text-main)' }} />
+
+                                <button onClick={handleLogout} className="group flex items-center gap-2.5 pl-4 pr-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-red-500 transition-all border border-red-500/20 hover:bg-red-500/10 active:scale-95">
+                                    <span className="hidden lg:block">Exit Terminal</span> <LogOut className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
                                 </button>
                             </div>
                         </div>
                     ) : (
                         <div className="flex items-center justify-between w-full h-full">
-                            <div className="flex items-center gap-4">
-                                <button className="md:hidden p-2 rounded-xl" onClick={() => setSidebarOpen(true)} style={{ color: 'var(--luna-steel)' }}><Menu className="w-5 h-5" /></button>
+                            {/* Left: Institutional Meta-Layer */}
+                            <div className="flex items-center gap-6">
+                                <button className="md:hidden p-2 rounded-xl transition-all hover:bg-[var(--luna-border)]" onClick={() => setSidebarOpen(true)} style={{ color: 'var(--luna-teal)' }}>
+                                    <Menu className="w-5 h-5" />
+                                </button>
+                                
+                                <div className="hidden md:flex items-center gap-5">
+                                    <div className="flex flex-col items-end">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-1 h-3.5 rounded-full bg-emerald-500/60 shadow-[0_0_8px_rgba(16,185,129,0.2)]" />
+                                            <p className="text-[15px] font-bold tracking-tight" style={{ color: 'var(--luna-text-main)', fontFamily: "'Inter', sans-serif" }}>
+                                                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).replace(' AM', '').replace(' PM', '')}
+                                                <span className="text-[9px] font-black opacity-30 ml-1 uppercase">
+                                                    {currentTime.toLocaleTimeString([], { hour12: true }).split(' ').pop()}
+                                                </span>
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="h-6 w-[1px] opacity-10 hidden md:block" style={{ background: 'var(--luna-text-main)' }} />
+
+                                    <div className="flex flex-col">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.15em] leading-none" style={{ color: 'var(--luna-text-main)' }}>
+                                            {currentTime.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase()}
+                                        </p>
+                                        <p className="text-[8px] font-bold uppercase tracking-[0.15em] opacity-30 mt-1" style={{ color: 'var(--luna-text-muted)' }}>
+                                            {currentTime.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase()}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2 notranslate" translate="no">
+
+                            {/* Right: Operational controls */}
+                            <div className="flex items-center gap-2 shrink-0">
+                                <div className="hidden xl:flex items-center gap-3 mr-4 pr-4 border-r" style={{ borderColor: 'var(--luna-border)' }}>
+                                    <p className="text-[11px] font-extrabold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>{user?.get_name || user?.full_name}</p>
+                                    <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border" 
+                                          style={{ 
+                                              background: 'var(--luna-info-bg)', 
+                                              color: 'var(--luna-teal)',
+                                              borderColor: 'var(--luna-teal)',
+                                              opacity: 0.8
+                                          }}>
+                                        {user?.role}
+                                    </span>
+                                </div>
+
                                 <div className="relative" ref={langRef}>
-                                    <button className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border shadow-2xl backdrop-blur-md active:scale-95" style={{ color: 'var(--luna-text-main)', background: 'rgba(255, 255, 255, 0.03)', borderColor: 'var(--luna-border)' }} onClick={() => setLangOpen(!langOpen)}>
-                                        <Globe className="w-3.5 h-3.5 opacity-60" style={{ color: 'var(--luna-teal)' }} />
-                                        <span className="hidden sm:inline">{currentLang.code.toUpperCase()}</span>
-                                        <span className="sm:hidden">{currentLang.code.toUpperCase()}</span>
-                                        <ChevronDown className="w-3 h-3 opacity-40" />
+                                    <button className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border bg-[var(--luna-card)] hover:bg-white/5 group" 
+                                            style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }} 
+                                            onClick={() => setLangOpen(!langOpen)}>
+                                        <Globe className="w-3.5 h-3.5 opacity-60 transition-transform group-hover:rotate-12" style={{ color: 'var(--luna-teal)' }} />
+                                        <span className="hidden lg:inline-block translate-y-[0.5px]">{currentLang.label}</span>
+                                        <span className="lg:hidden">{currentLang.code.toUpperCase()}</span>
+                                        <ChevronDown className={`w-3 h-3 transition-transform duration-300 ${langOpen ? 'rotate-180' : 'opacity-40'}`} />
                                     </button>
                                     {langOpen && (
-                                        <div className="absolute right-0 mt-2 w-52 rounded-2xl overflow-hidden z-50 shadow-2xl border" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                                            <div className="px-4 py-2 text-[8px] font-black uppercase tracking-[0.3em] opacity-40 border-b" style={{ borderColor: 'var(--luna-border)' }}>Translation Hub</div>
-                                            {LANGUAGES.map(lang => (
-                                                <button key={lang.code} className="w-full text-left px-4 py-2.5 text-xs font-bold flex items-center justify-between gap-2 transition-all hover:bg-[var(--luna-info-bg)]" style={{ color: i18n.language === lang.code ? 'var(--luna-teal)' : 'var(--luna-text-muted)', background: i18n.language === lang.code ? 'var(--luna-navy)' : 'transparent' }} onClick={() => switchLang(lang.code)}>
-                                                    <div className="flex items-center gap-2"><span>{lang.flag}</span> <span>{lang.label}</span></div>
-                                                    {i18n.language === lang.code && <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--luna-blue)' }} />}
-                                                </button>
-                                            ))}
+                                        <div className="absolute right-0 mt-3 w-56 rounded-2xl overflow-hidden z-50 shadow-[0_20px_50px_rgba(0,0,0,0.3)] border" 
+                                             style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)', backdropFilter: 'blur(30px)' }}>
+                                            <div className="px-4 py-3 text-[9px] font-black uppercase tracking-[0.25em] opacity-40 border-b" style={{ borderColor: 'var(--luna-border)' }}>
+                                                Regional Identity Hub
+                                            </div>
+                                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-1.5">
+                                                {LANGUAGES.map(lang => (
+                                                    <button key={lang.code} className="w-full text-left px-4 py-3 text-[11px] font-bold flex items-center justify-between gap-3 rounded-xl transition-all hover:bg-white/5 group/lang" 
+                                                            style={{ color: i18n.language === lang.code ? 'var(--luna-teal)' : 'var(--luna-text-muted)', background: i18n.language === lang.code ? 'rgba(56,189,248,0.05)' : 'transparent' }} 
+                                                            onClick={() => switchLang(lang.code)}>
+                                                        <div className="flex items-center gap-2.5">
+                                                            <span className="text-sm transition-transform group-hover/lang:scale-110">{lang.flag}</span>
+                                                            <span>{lang.label}</span>
+                                                        </div>
+                                                        {i18n.language === lang.code && <div className="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(56,189,248,0.4)]" style={{ background: 'var(--luna-blue)' }} />}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
-                                <button onClick={toggleTheme} className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:bg-[var(--luna-border)]" style={{ background: 'var(--luna-info-bg)', color: 'var(--luna-teal)' }}>{theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}</button>
-                                <Link to="/dashboard/notifications" className="w-8 h-8 rounded-xl flex items-center justify-center relative transition-all hover:bg-[var(--luna-border)]" style={{ background: 'var(--luna-info-bg)', color: 'var(--luna-text-muted)' }}>
-                                    <BellRing className="w-4 h-4" />
-                                    {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-white text-[8px] font-black flex items-center justify-center" style={{ background: 'var(--luna-danger-text)' }}>{unreadCount}</span>}
+
+                                <button onClick={toggleTheme} className="flex items-center gap-2.5 px-4 h-10 rounded-xl transition-all border group bg-[var(--luna-card)]" 
+                                        style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-teal)' }}>
+                                    {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+                                    <span className="hidden lg:inline-block text-[10px] font-black uppercase tracking-widest translate-y-[0.5px]">Theme</span>
+                                </button>
+
+                                <Link to="/dashboard/notifications" className="flex items-center gap-2.5 px-4 h-10 rounded-xl relative transition-all border group bg-[var(--luna-card)]" 
+                                      style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-dim)' }}>
+                                    <BellRing className="w-3.5 h-3.5 opacity-60 group-hover:text-amber-500 transition-colors" />
+                                    <span className="hidden lg:inline-block text-[10px] font-black uppercase tracking-widest translate-y-[0.5px]">Notifications</span>
+                                    {unreadCount > 0 && (
+                                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow-lg border-2" 
+                                              style={{ background: 'var(--luna-danger-text)', borderColor: 'var(--luna-card)' }}>
+                                            {unreadCount > 99 ? '99+' : unreadCount}
+                                        </span>
+                                    )}
                                 </Link>
                             </div>
                         </div>
@@ -547,6 +655,11 @@ const Dashboard = () => {
                     )}
                 </main>
             </div>
+            <SearchModal 
+                isOpen={isSearchOpen} 
+                onClose={() => setIsSearchOpen(false)} 
+                userRole={user?.role} 
+            />
         </div>
     );
 };

@@ -155,7 +155,8 @@ const NotificationsPage = () => {
                                     <div 
                                         key={n.id || i}
                                         onClick={() => markSingleRead(n.id)}
-                                        className={`group p-4 flex gap-4 border-b border-slate-100 dark:border-white/5 last:border-none cursor-pointer transition-all ${!n.is_read ? 'bg-black/[0.02] dark:bg-white/[0.02]' : 'opacity-60 grayscale-[0.5] hover:opacity-100 hover:grayscale-0'}`}
+                                        className={`group p-4 flex gap-4 border-b last:border-none cursor-pointer transition-all ${!n.is_read ? 'bg-black/[0.02] dark:bg-white/[0.02]' : 'opacity-60 grayscale-[0.5] hover:opacity-100 hover:grayscale-0'}`}
+                                        style={{ borderColor: 'var(--luna-border)' }}
                                     >
                                         <div className="mt-1">
                                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: !n.is_read ? priority.color : 'var(--luna-text-dim)' }} />

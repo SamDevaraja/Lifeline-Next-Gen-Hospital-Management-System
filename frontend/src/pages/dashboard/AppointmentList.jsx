@@ -6,13 +6,13 @@ import {
     Stethoscope, BrainCircuit, BarChart3, AlertCircle, CheckCircle,
     Clock, X, Menu, Video, Pill, FlaskConical, Smartphone,
     QrCode, User, Mic, ArrowRight, Sun, Moon, Globe,
-    ChevronDown, Filter, Mail, Lock, RefreshCw
+    ChevronDown, Filter, Mail, Lock, RefreshCw, ShieldCheck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContext';
-import { ConfirmModal, InputModal, DetailsModal } from './Modals';
+import { ConfirmModal, InputModal, DetailsModal, Modal } from './Modals';
 import { LUNA } from "./Constants";
 
 const AppointmentList = ({ user }) => {
@@ -26,8 +26,10 @@ const AppointmentList = ({ user }) => {
     const [myPatients, setMyPatients] = useState([]);
     const [confirmCancel, setConfirmCancel] = useState({ open: false, id: null });
     const [linkModal, setLinkModal] = useState({ open: false, appt: null });
+    const [manageModal, setManageModal] = useState({ open: false, appt: null });
     const [newApptModal, setNewApptModal] = useState({ open: false });
     const [detailsModal, setDetailsModal] = useState({ open: false, item: null });
+    const [availableSlots, setAvailableSlots] = useState({});
 
     const fetchAppointments = async () => {
         setLoading(true);
@@ -72,14 +74,12 @@ const AppointmentList = ({ user }) => {
         });
 
         return list.sort((a, b) => {
-            // 1. Specialized clinical priority mapping (Completed as last)
             const priorities = { 'pending': 1, 'confirmed': 2, 'cancelled': 3, 'completed': 4 };
             const pA = priorities[a.status] || 5;
             const pB = priorities[b.status] || 5;
 
             if (pA !== pB) return pA - pB;
 
-            // 2. Secondary alphabetical patient alignment
             const nameA = (a.patientName || '').toLowerCase();
             const nameB = (b.patientName || '').toLowerCase();
             return nameA.localeCompare(nameB);
@@ -93,17 +93,34 @@ const AppointmentList = ({ user }) => {
         confirmed: allAppointments.filter(a => a.status === 'confirmed').length
     }), [allAppointments]);
 
-    const handleCancel = async () => {
-        const id = confirmCancel.id;
+    const updateStatus = async (apptId, newStatus) => {
         try {
-            toast.loading("Updating schedule...", { id: 'cancel' });
-            await api.patch(`appointments/${id}/`, { status: 'cancelled' });
-            toast.success("Appointment cancelled.", { id: 'cancel' });
+            await api.patch(`appointments/${apptId}/`, { status: newStatus });
+            toast.success(`Protocol status updated to ${newStatus.replace('-', ' ')}.`);
+            setManageModal({ open: false, appt: null });
+            fetchAppointments();
+        } catch (e) {
+            toast.error("Status synchronization failed.");
+        }
+    };
+
+    const STATUS_FLOW = [
+        { key: 'scheduled', label: 'Confirmed', icon: <CheckCircle className="w-4 h-4"/> },
+        { key: 'arrived', label: 'Patient Arrived', icon: <Users className="w-4 h-4"/> },
+        { key: 'in-consultation', label: 'In Consultation', icon: <Stethoscope className="w-4 h-4"/> },
+        { key: 'completed', label: 'Finalized', icon: <ShieldCheck className="w-4 h-4"/> }
+    ];
+
+    const handleCancel = async () => {
+        if (!confirmCancel.id) return;
+        try {
+            await api.patch(`appointments/${confirmCancel.id}/`, { status: 'cancelled' });
+            toast.success("Engagement formally terminated.");
             setConfirmCancel({ open: false, id: null });
+            setManageModal({ open: false, appt: null });
             fetchAppointments();
         } catch (err) {
-            toast.error("Update failed.", { id: 'cancel' });
-            setConfirmCancel({ open: false, id: null });
+            toast.error("Termination failure.");
         }
     };
 
@@ -119,8 +136,6 @@ const AppointmentList = ({ user }) => {
             toast.error("Transmission error.");
         }
     };
-
-    const [availableSlots, setAvailableSlots] = useState({});
 
     const handleModalFieldChange = async (key, val, allValues) => {
         const date = allValues.date;
@@ -140,21 +155,25 @@ const AppointmentList = ({ user }) => {
                 const clock = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                 const occupancy = availableSlots[clock] || 0;
                 if (occupancy < 3) {
+                    const [h_p, m_p] = clock.split(':').map(Number);
+                    const blockEndTotal = m_p + 30;
+                    const blockEndH = h_p + Math.floor(blockEndTotal / 60);
+                    const blockEndM = blockEndTotal % 60;
+                    const blockRange = `${clock} - ${String(blockEndH).padStart(2, '0')}:${String(blockEndM).padStart(2, '0')}`;
+
                     options.push({ 
                         value: clock, 
                         label: (
-                            <div className="flex flex-col items-center justify-center gap-1.5 py-1">
-                                <span className="text-[14px] font-black leading-none">{clock}</span>
-                                <div className="flex items-center gap-1.5">
-                                    <div className="flex gap-0.5">
-                                        {[1, 2, 3].map(i => (
-                                            <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${i <= occupancy ? 'bg-slate-500/20' : 'bg-[var(--luna-teal)] shadow-[0_0_8px_var(--luna-teal)]'}`} />
-                                        ))}
-                                    </div>
-                                    <span className="text-[8px] font-black opacity-40 tracking-widest leading-none">
-                                        {3 - occupancy} AVAIL
-                                    </span>
+                            <div className="flex flex-col items-center justify-center py-2 px-1">
+                                <span className="text-[15px] font-black tracking-tighter" style={{ color: 'var(--luna-text-main)' }}>{blockRange}</span>
+                                <div className="mt-2 w-full h-[3px] rounded-full overflow-hidden flex gap-[2px] bg-slate-500/10">
+                                    {[1, 2, 3].map(i => (
+                                        <div key={i} className={`flex-1 transition-all duration-300 ${i <= (3 - occupancy) ? 'bg-[var(--luna-blue)]' : 'bg-transparent'}`} />
+                                    ))}
                                 </div>
+                                <span className="text-[7.5px] font-bold opacity-30 mt-2 tracking-[0.05em]" style={{ fontFamily: "'Inter', sans-serif" }}>
+                                    {3 - occupancy} SLOTS AVAILABLE
+                                </span>
                             </div>
                         )
                     });
@@ -169,8 +188,8 @@ const AppointmentList = ({ user }) => {
             <Toaster position="top-right" />
             <ConfirmModal
                 isOpen={confirmCancel.open}
-                title="Decommission Slot"
-                message="Are you sure you want to cancel this clinical appointment? This action will immediately release the synchronized slot."
+                title="Cancel Appointment"
+                message="Are you sure you want to cancel this appointment? This will immediately free up the time slot for other patients."
                 onConfirm={handleCancel}
                 onCancel={() => setConfirmCancel({ open: false, id: null })}
                 type="danger"
@@ -181,16 +200,96 @@ const AppointmentList = ({ user }) => {
                 data={detailsModal.item}
                 onCancel={() => setDetailsModal({ open: false, item: null })}
             />
+            <Modal
+                isOpen={manageModal.open}
+                onClose={() => setManageModal({ open: false, appt: null })}
+                title="Manage Appointment"
+                maxWidth="max-w-3xl"
+            >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Left Column: Encounter Identity & Status */}
+                    <div className="space-y-6">
+                        <div className="p-4 rounded-xl border bg-[var(--luna-navy)] border-[var(--luna-border)]">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg border shadow-sm"
+                                    style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)', color: 'var(--luna-blue)' }}>
+                                    {manageModal.appt?.patientName[0]}
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>{manageModal.appt?.patientName}</h3>
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">ID Number: #{manageModal.appt?.id}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <span className="text-[10px] font-black uppercase tracking-[0.25em] opacity-40 mb-3 block">Appointment Status</span>
+                            <div className="grid grid-cols-1 gap-2">
+                                {STATUS_FLOW.map((step) => {
+                                    const current = manageModal.appt?.status === step.key;
+                                    return (
+                                        <button
+                                            key={step.key}
+                                            onClick={() => updateStatus(manageModal.appt.id, step.key)}
+                                            className={`flex items-center gap-4 p-3.5 rounded-2xl border transition-all ${current ? 'bg-[var(--luna-primary)]/10 border-[var(--luna-primary)]/40 text-[var(--luna-primary)]' : 'bg-[var(--luna-card)] border-[var(--luna-border)] opacity-60 hover:opacity-100 hover:bg-white/5'}`}
+                                        >
+                                            <div className={`w-9 h-9 flex items-center justify-center rounded-xl shadow-sm ${current ? 'bg-[var(--luna-primary)] text-white' : 'bg-slate-500/10'}`}>
+                                                {step.icon}
+                                            </div>
+                                            <span className="text-[11px] font-black uppercase tracking-widest">{step.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Bridge & Termination */}
+                    <div className="flex flex-col space-y-6">
+                        <div>
+                            <span className="text-[10px] font-black uppercase tracking-[0.25em] opacity-40 mb-3 block">Video Link</span>
+                            <button 
+                                onClick={() => {
+                                    setLinkModal({ open: true, appt: manageModal.appt });
+                                    setManageModal({ open: false, appt: null });
+                                }}
+                                className="w-full flex items-center justify-between p-4 rounded-2xl border bg-[var(--luna-card)] border-[var(--luna-border)] hover:bg-[var(--luna-primary)]/5 transition-all group"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-500/10 opacity-60 group-hover:opacity-100 transition-opacity">
+                                        <Globe className="w-4 h-4" style={{ color: 'var(--luna-blue)' }} />
+                                    </div>
+                                    <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: 'var(--luna-text-main)' }}>Edit Video Link</span>
+                                </div>
+                                <ChevronRight className="w-4 h-4 opacity-20 group-hover:opacity-40 transition-opacity" />
+                            </button>
+                            <p className="mt-4 text-[10px] font-bold opacity-30 leading-relaxed px-2">
+                                Changing this link will update the patient's portal immediately.
+                            </p>
+                        </div>
+
+                        <div className="pt-6 border-t border-dashed space-y-4" style={{ borderColor: 'var(--luna-border)' }}>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 text-center" style={{ color: 'var(--luna-danger-text)' }}>Cancel / Close Appointment</p>
+                            <button 
+                                onClick={() => setConfirmCancel({ open: true, id: manageModal.appt.id })}
+                                className="w-full p-4 rounded-2xl border border-rose-500/20 text-rose-500 bg-rose-500/5 hover:bg-rose-500/10 transition-all text-[11px] font-black uppercase tracking-[0.2em] shadow-sm active:scale-95"
+                            >
+                                Cancel Appointment
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Modal>
             <InputModal
                 isOpen={linkModal.open}
-                title="Update Secure Meeting Link"
-                fields={[{ key: 'link', label: 'Meeting URL', placeholder: 'https://meet.google.com/xxx-xxxx-xxx', initialValue: linkModal.appt?.meeting_link, autoFocus: true }]}
+                title="Update Video Link"
+                fields={[{ key: 'link', label: 'Video Link', placeholder: 'https://meet.google.com/xxx-xxxx-xxx', initialValue: linkModal.appt?.meeting_link, autoFocus: true }]}
                 onConfirm={handleUpdateLink}
                 onCancel={() => setLinkModal({ open: false, appt: null })}
             />
             <InputModal
                 isOpen={newApptModal.open}
-                title="Schedule New Clinical Encounter"
+                title="Schedule New Appointment"
                 onFieldChange={handleModalFieldChange}
                 fields={[
                     user?.role === 'doctor' ? {
@@ -219,8 +318,8 @@ const AppointmentList = ({ user }) => {
                 ]}
                 onConfirm={(vals) => {
                     const { date, time, doctor, patient, description } = vals;
-                    const finalPatient = user?.role === 'doctor' ? patient : user.id;
-                    const finalDoctor = user?.role === 'doctor' ? user.doctor_id : doctor;
+                    const finalPatient = user?.role === 'doctor' ? patient : (user.patient_id || user.id);
+                    const finalDoctor = user?.role === 'doctor' ? (user.doctor_id || user.id) : doctor;
 
                     if (!date || !time || !finalPatient || !finalDoctor) {
                         toast.error("Missing critical scheduling parameters.");
@@ -242,13 +341,12 @@ const AppointmentList = ({ user }) => {
                 onCancel={() => { setNewApptModal({ open: false }); setAvailableSlots({}); }}
             />
 
-            {/* Mini Stats Row - Absolute Consistency with Specialists/Pharmacy */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                    { label: 'Total Appointments', value: allAppointments.length, color: 'var(--luna-teal)' },
-                    { label: "Today's Agenda", value: stats.today, color: '#10b981' },
-                    { label: 'Pending Auth', value: stats.pending, color: '#f59e0b' },
-                    { label: 'Confirmed Slots', value: stats.confirmed, color: '#6366f1' },
+                    { label: 'Total Appointments', value: allAppointments.length, color: 'var(--luna-blue)' },
+                    { label: "Today's Agenda", value: stats.today, color: 'var(--luna-blue)' },
+                    { label: 'Pending Auth', value: stats.pending, color: 'var(--luna-blue)' },
+                    { label: 'Confirmed Slots', value: stats.confirmed, color: 'var(--luna-blue)' },
                 ].map((s, i) => (
                     <div key={i} className="p-4 border rounded-xl shadow-sm bg-[var(--luna-card)]" style={{ borderColor: 'var(--luna-border)' }}>
                         <p className="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-1" style={{ fontFamily: "'Inter', sans-serif" }}>{s.label}</p>
@@ -258,13 +356,11 @@ const AppointmentList = ({ user }) => {
             </div>
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
+                <div className="flex items-center gap-3">
                     <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Patient Appointments</h1>
-                    <div className="flex items-center gap-3 mt-1">
-                        <button onClick={fetchAppointments} className={`p-1 opacity-40 hover:opacity-100 transition-all ${loading ? 'animate-spin' : ''}`}>
-                             <RefreshCw className="w-3 h-3" />
-                         </button>
-                    </div>
+                    <button onClick={fetchAppointments} className={`p-1 opacity-40 hover:opacity-100 transition-all ${loading ? 'animate-spin' : ''}`}>
+                             <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="relative group w-full md:w-64">
@@ -307,16 +403,16 @@ const AppointmentList = ({ user }) => {
 
             <div className="card overflow-hidden !p-0 shadow-sm rounded-xl border" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
                 <div className="overflow-x-auto custom-scrollbar">
-                    <table className="w-full text-left border-collapse">                        <thead>
-                        <tr style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderBottom: '1px solid var(--luna-border)' }}>
-                            <th className="pl-6 pr-4 py-4 text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Patient Demographics</th>
-                            {user?.role !== 'doctor' && <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Assigned Doctor</th>}
-                            <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Date & Time</th>
-                            <th className="px-4 py-4 text-center text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Status Layer</th>
-                            <th className="px-4 py-4 text-right pr-6 text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Terminal Actions</th>
-                        </tr>
-
-                    </thead>
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderBottom: '1px solid var(--luna-border)' }}>
+                                <th className="pl-6 pr-4 py-4 text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Patient Demographics</th>
+                                {user?.role !== 'doctor' && <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Assigned Doctor</th>}
+                                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Date & Time</th>
+                                <th className="px-4 py-4 text-center text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Status Layer</th>
+                                <th className="px-4 py-4 text-right pr-6 text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Terminal Actions</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             {loading ? (
                                 Array(5).fill(0).map((_, i) => (
@@ -337,7 +433,7 @@ const AppointmentList = ({ user }) => {
                                     </td>
                                 </tr>
                             ) : filteredData.map((a, i) => (
-                                <tr key={a.id || i} className="group hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b last:border-0" style={{ borderColor: 'var(--luna-border)' }}>
+                                <tr key={a.id} className="group hover:bg-[var(--luna-navy)] transition-colors border-b last:border-b-0" style={{ borderColor: 'var(--luna-border)' }}>
                                     <td className="pl-6 pr-4 py-4">
                                         <div className="flex items-center gap-4">
                                             <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-inner shrink-0 border transition-transform group-hover:scale-105"
@@ -345,22 +441,21 @@ const AppointmentList = ({ user }) => {
                                                 <User className="w-4 h-4 opacity-40" />
                                             </div>
                                             <div className="text-left">
-                                                <p className="font-extrabold text-[14px] cursor-pointer hover:text-[var(--luna-teal)] transition-colors inline-block"
+                                                <p className="font-semibold text-sm tracking-tight cursor-pointer hover:text-[var(--luna-teal)] transition-colors inline-block"
                                                     onClick={() => setDetailsModal({ open: true, item: a })}
                                                     style={{ color: 'var(--luna-text-main)' }}>
                                                     {a.patientName}
                                                 </p>
-                                                <p className="text-[8.5px] font-black uppercase tracking-[0.15em] opacity-40 mt-0.5" style={{ color: 'var(--luna-text-muted)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                                    REF-{String(a.id).padStart(4, '0')} • SYNCED
+                                                <p className="text-[10px] font-bold opacity-30 mt-0.5 uppercase tracking-wider">
+                                                    REF-{String(a.id).padStart(4, '0')} • Synced
                                                 </p>
                                             </div>
                                         </div>
                                     </td>
                                     {user?.role !== 'doctor' && (
                                         <td className="px-4 py-4 hidden sm:table-cell">
-                                            <span className="text-[11px] font-bold cursor-pointer hover:text-[var(--luna-teal)] transition-colors"
-                                                onClick={() => setDetailsModal({ open: true, item: a })}
-                                                style={{ color: 'var(--luna-text-muted)' }}>
+                                            <span className="text-[11px] font-bold opacity-60 cursor-pointer hover:text-[var(--luna-teal)] transition-colors"
+                                                onClick={() => setDetailsModal({ open: true, item: a })}>
                                                 Dr. {a.doctorName}
                                             </span>
                                         </td>
@@ -368,9 +463,9 @@ const AppointmentList = ({ user }) => {
 
                                     <td className="px-4 py-4 hidden sm:table-cell">
                                         <div className="flex flex-col">
-                                            <span className="text-[12px] font-black" style={{ color: 'var(--luna-text-main)' }}>{a.appointment_date}</span>
-                                            <div className="flex items-center gap-1.5 opacity-60 mt-0.5">
-                                                <Clock className="w-3 h-3" />
+                                            <span className="text-[12px] font-semibold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>{a.appointment_date}</span>
+                                            <div className="flex items-center gap-1.5 opacity-40 mt-1">
+                                                <Clock className="w-3.5 h-3.5" />
                                                 <span className="text-[10px] font-bold uppercase">{a.appointment_time || 'UNSET'}</span>
                                             </div>
                                         </div>
@@ -378,86 +473,36 @@ const AppointmentList = ({ user }) => {
 
                                     <td className="px-4 py-4 text-center hidden sm:table-cell">
                                         <span className={`inline-flex items-center gap-1.5 px-3 py-1 font-black uppercase tracking-[0.1em] text-[10px] rounded-md border shadow-sm mx-auto whitespace-nowrap ${a.status === 'confirmed' || a.status === 'completed' || a.status === 'arrived' || a.status === 'in-consultation'
-                                                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                                ? 'bg-blue-500/10 text-blue-500 border-blue-500/20'
                                                 : a.status === 'cancelled'
-                                                    ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-                                                    : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                                                    ? 'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                                                    : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
                                             }`} style={{ fontFamily: "'Inter', sans-serif" }}>
                                             <div className={`w-1.5 h-1.5 rounded-full ${(a.status === 'confirmed' || a.status === 'completed' || a.status === 'arrived' || a.status === 'in-consultation')
-                                                    ? 'bg-emerald-500 animate-pulse'
+                                                    ? 'bg-blue-500 animate-pulse'
                                                     : a.status === 'cancelled'
-                                                        ? 'bg-rose-500'
-                                                        : 'bg-yellow-500'}`} />
+                                                        ? 'bg-slate-500'
+                                                        : 'bg-blue-500'}`} />
                                             {a.status.replace('-', ' ')}
                                         </span>
                                     </td>
 
                                     <td className="px-4 py-4 pr-6">
-                                        <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                                            {/* Bridge Launch (Always Present) */}
+                                        <div className="flex items-center justify-end gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                            {/* Primary Bridge Access */}
                                             <button
                                                 onClick={() => (a.meeting_link || a.doctor_permanent_link) && window.open(a.meeting_link || a.doctor_permanent_link, '_blank')}
                                                 title={(a.meeting_link || a.doctor_permanent_link) ? "Launch Telemedicine Bridge" : "No active clinical bridge established"}
-                                                className={`p-1.5 rounded-lg border bg-[var(--luna-card)] border-emerald-500/30 text-emerald-500 transition-all shadow-sm ${(a.meeting_link || a.doctor_permanent_link) ? 'hover:bg-emerald-500/10 hover:-translate-y-0.5' : 'opacity-40 pointer-events-none cursor-not-allowed'}`}>
+                                                className={`p-2 rounded-lg border bg-[var(--luna-card)] border-[var(--luna-border)] text-[var(--luna-primary)] transition-all shadow-sm ${(a.meeting_link || a.doctor_permanent_link) ? 'hover:bg-[var(--luna-primary)]/10 hover:border-[var(--luna-primary)]/30 hover:-translate-y-0.5' : 'opacity-20 pointer-events-none'}`}>
                                                 <Video className="w-4 h-4" />
                                             </button>
 
-                                            {/* Patient Check-in (Always Present) */}
-                                            <button onClick={async () => {
-                                                if (a.status === 'confirmed' && (user.role === 'admin' || user.role === 'receptionist')) {
-                                                    try {
-                                                        await api.patch(`appointments/${a.id}/`, { status: 'arrived' });
-                                                        toast.success("Patient Check-in Confirmed.");
-                                                        fetchAppointments();
-                                                    } catch (e) { toast.error("Check-in failed."); }
-                                                }
-                                            }} title="Confirm Arrival"
-                                                className={`p-1.5 rounded-lg border bg-[var(--luna-card)] border-emerald-500/30 text-emerald-500 transition-all shadow-sm ${(a.status === 'confirmed' && (user.role === 'admin' || user.role === 'receptionist')) ? 'hover:bg-emerald-500/10 hover:-translate-y-0.5' : 'opacity-40 pointer-events-none cursor-not-allowed'}`}>
-                                                <CheckCircle className="w-4 h-4" />
+                                            <button 
+                                                onClick={() => setManageModal({ open: true, appt: a })}
+                                                className="p-2 rounded-lg border bg-[var(--luna-card)] border-[var(--luna-border)] text-[var(--luna-text-dim)] hover:bg-[var(--luna-primary)]/5 transition-all shadow-sm"
+                                                title="Open Encounter Management">
+                                                <Settings className="w-4 h-4" />
                                             </button>
-
-                                            {/* Link Configuration (Always Present) */}
-                                            <button
-                                                onClick={() => (user.role === 'admin' || user.role === 'doctor') && setLinkModal({ open: true, appt: a })}
-                                                title="Configure Secure Link"
-                                                className={`p-1.5 rounded-lg border bg-[var(--luna-card)] border-blue-500/30 text-blue-500 transition-all shadow-sm ${(user.role === 'admin' || user.role === 'doctor') ? 'hover:bg-blue-500/10 hover:-translate-y-0.5' : 'opacity-40 cursor-not-allowed'}`}>
-                                                <LinkIcon className="w-4 h-4" />
-                                            </button>
-
-                                            {/* Termination Slot (Always Present) */}
-                                            <button
-                                                onClick={() => (a.status === 'pending' || a.status === 'confirmed') && setConfirmCancel({ open: true, id: a.id })}
-                                                title="Terminate Slot"
-                                                className={`p-1.5 rounded-lg border bg-[var(--luna-card)] border-rose-500/30 text-rose-500 transition-all shadow-sm ${(a.status === 'pending' || a.status === 'confirmed') ? 'hover:bg-rose-500/10 hover:-translate-y-0.5' : 'opacity-40 cursor-not-allowed'}`}>
-                                                <Lock className="w-4 h-4" />
-                                            </button>
-
-                                            {/* Post-Arrival Phase Transitions (Doctor Focused) */}
-                                            {(a.status === 'arrived' && user.role === 'doctor') && (
-                                                <button onClick={async () => {
-                                                    try {
-                                                        await api.patch(`appointments/${a.id}/`, { status: 'in-consultation' });
-                                                        toast.success("Consultation Sequence Started.");
-                                                        fetchAppointments();
-                                                    } catch (e) { toast.error("Signal failure."); }
-                                                }} title="Start Consultation"
-                                                    className="p-1.5 rounded-lg border bg-[var(--luna-card)] border-blue-500/30 text-blue-500 hover:bg-blue-500/10 transition-all hover:-translate-y-0.5 shadow-sm">
-                                                    <Activity className="w-4 h-4" />
-                                                </button>
-                                            )}
-
-                                            {(a.status === 'in-consultation' && user.role === 'doctor') && (
-                                                <button onClick={async () => {
-                                                    try {
-                                                        await api.patch(`appointments/${a.id}/`, { status: 'completed' });
-                                                        toast.success("Consultation finalized.");
-                                                        fetchAppointments();
-                                                    } catch (e) { toast.error("Closure failed."); }
-                                                }} title="Complete Consultation"
-                                                    className="p-1.5 rounded-lg border bg-[var(--luna-card)] border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 transition-all hover:-translate-y-0.5 shadow-sm">
-                                                    <Sparkles className="w-4 h-4" />
-                                                </button>
-                                            )}
                                         </div>
                                     </td>
                                 </tr>

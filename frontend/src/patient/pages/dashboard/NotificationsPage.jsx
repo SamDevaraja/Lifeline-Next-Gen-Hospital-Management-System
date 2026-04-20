@@ -7,8 +7,10 @@ import {
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast, { Toaster } from 'react-hot-toast';
+import { useTheme } from '../../context/ThemeContext';
 
 const NotificationsPage = () => {
+    const { theme } = useTheme();
     const [notifs, setNotifs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('all');
@@ -17,7 +19,7 @@ const NotificationsPage = () => {
     const fetchNotifications = async () => {
         try {
             const r = await api.get('notifications/');
-            setNotifs(r.data);
+            setNotifs(Array.isArray(r.data) ? r.data : []);
         } catch (err) {
             setNotifs([]);
         } finally {
@@ -80,8 +82,8 @@ const NotificationsPage = () => {
     };
 
     return (
-        <div className="min-h-full w-full transition-colors" style={{ background: 'var(--luna-bg)', color: 'var(--luna-text-main)' }}>
-            <div className="max-w-[1400px] mx-auto px-6 py-6 font-sans">
+        <div className="min-h-full w-full">
+            <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-4 md:py-8 font-sans">
             <Toaster position="top-right" />
 
             {/* Header: CLEAN & MINIMAL */}
@@ -155,19 +157,20 @@ const NotificationsPage = () => {
                                     <div 
                                         key={n.id || i}
                                         onClick={() => markSingleRead(n.id)}
-                                        className={`group p-4 flex gap-4 border-b border-slate-100 dark:border-white/5 last:border-none cursor-pointer transition-all ${!n.is_read ? 'bg-black/[0.02] dark:bg-white/[0.02]' : 'opacity-60 grayscale-[0.5] hover:opacity-100 hover:grayscale-0'}`}
+                                        className={`group p-4 flex gap-4 border-b last:border-none cursor-pointer transition-all ${!n.is_read ? 'bg-black/[0.02] dark:bg-white/[0.02]' : 'opacity-60 grayscale-[0.5] hover:opacity-100 hover:grayscale-0'}`}
+                                        style={{ borderColor: 'var(--luna-border)' }}
                                     >
                                         <div className="mt-1">
                                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: !n.is_read ? priority.color : 'var(--luna-text-dim)' }} />
                                         </div>
                                         
                                         <div className="flex-grow min-w-0 space-y-1">
-                                            <div className="flex items-center justify-between gap-4">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border`} style={{ color: priority.color, backgroundColor: priority.bg, borderColor: `${priority.color}30` }}>
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+                                                <div className="flex flex-wrap items-center gap-2 min-w-0">
+                                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border shrink-0`} style={{ color: priority.color, backgroundColor: priority.bg, borderColor: `${priority.color}30` }}>
                                                         {priority.label}
                                                     </span>
-                                                    <h3 className={`text-sm font-semibold truncate`}>
+                                                    <h3 className={`text-sm font-semibold whitespace-normal leading-tight overflow-hidden break-words`}>
                                                         {n.title}
                                                     </h3>
                                                 </div>
@@ -177,13 +180,13 @@ const NotificationsPage = () => {
                                                 </div>
                                             </div>
                                             
-                                            <p className="text-sm leading-relaxed line-clamp-2 pr-6 opacity-70">
+                                            <p className="text-sm leading-relaxed pr-2 opacity-70 break-words">
                                                 {n.message}
                                             </p>
 
                                             <div className="flex items-center gap-3 pt-1">
                                                 <span className={`text-[11px] font-bold`} style={{ color: n.is_read ? 'var(--luna-success-text)' : 'var(--luna-text-dim)' }}>
-                                                    {n.is_read ? 'Resolved' : 'Medical Advisory'}
+                                                    {n.is_read ? 'Resolved' : 'Institutional Alert'}
                                                 </span>
                                             </div>
                                         </div>
@@ -197,12 +200,19 @@ const NotificationsPage = () => {
                                 );
                             })
                         ) : (
-                            <div className="py-24 flex flex-col items-center justify-center space-y-4 opacity-30">
-                                <Inbox className="w-12 h-12" />
-                                <div className="text-center">
-                                    <p className="text-sm font-semibold">Feed Synchronized</p>
-                                    <p className="text-xs">No notifications matching your current filters.</p>
-                                </div>
+                            <div className="py-32 flex flex-col items-center justify-center text-center">
+                                <motion.div 
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="w-20 h-20 rounded-full border flex items-center justify-center mb-6 shadow-sm"
+                                    style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}
+                                >
+                                    <Bell className="w-8 h-8 opacity-20" style={{ color: 'var(--luna-text-main)' }} />
+                                </motion.div>
+                                <h3 className="text-lg font-bold tracking-tight opacity-40 uppercase tracking-[0.2em] mb-2">No Notifications</h3>
+                                <p className="text-xs font-semibold opacity-30 max-w-[280px] leading-relaxed">
+                                    You're all caught up! There are no new alerts or messages for you to check right now.
+                                </p>
                             </div>
                         )}
                     </div>

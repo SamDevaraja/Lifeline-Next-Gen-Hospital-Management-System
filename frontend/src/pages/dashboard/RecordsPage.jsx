@@ -101,6 +101,30 @@ const RecordsPage = ({ user }) => {
         today: [...records, ...prescriptions].filter(i => (i.visit_date || i.created_at)?.includes(new Date().toISOString().split('T')[0])).length
     }), [records, prescriptions]);
 
+    const handleDownload = async (item) => {
+        const endpoint = item.__type === 'RECORD' ? 'medical-records' : 'prescriptions';
+        try {
+            toast.loading("Generating institutional transcript...", { id: 'pdf-gen' });
+            const response = await api.get(`${endpoint}/${item.id}/generate_pdf/`, {
+                responseType: 'blob'
+            });
+            
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            const filename = item.__type === 'RECORD' ? `Clinical_Record_${item.id}.pdf` : `Prescription_${item.qr_code_id || item.id}.pdf`;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            toast.success("Transcript downloaded successfully.", { id: 'pdf-gen' });
+        } catch (err) {
+            console.error("PDF Generation Failed:", err);
+            toast.error("Failed to generate clinical transcript.", { id: 'pdf-gen' });
+        }
+    };
+
     return (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pb-12">
             <Toaster position="top-right" />
@@ -121,17 +145,11 @@ const RecordsPage = ({ user }) => {
             />
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
+                <div className="flex items-center gap-3">
                     <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Medical Records</h1>
-                    <div className="flex items-center gap-3 mt-1">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40" style={{ color: 'var(--luna-text-muted)' }}>
-                            Access and manage patient medical history
-                        </p>
-                        <div className="w-1 h-1 rounded-full opacity-20" style={{ background: 'var(--luna-text-main)' }} />
-                        <button onClick={fetchAll} className={`p-1 opacity-40 hover:opacity-100 transition-all ${loading ? 'animate-spin' : ''}`}>
-                             <RefreshCw className="w-3 h-3" />
-                         </button>
-                    </div>
+                    <button onClick={fetchAll} className={`p-1 opacity-40 hover:opacity-100 transition-all ${loading ? 'animate-spin' : ''}`}>
+                             <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
                 </div>
 
 
@@ -147,19 +165,7 @@ const RecordsPage = ({ user }) => {
                         />
                     </div>
 
-                    <div className="relative">
-                        <select
-                            value={typeFilter}
-                            onChange={(e) => setTypeFilter(e.target.value)}
-                            className="pl-3 pr-8 py-2 text-xs border rounded-lg appearance-none cursor-pointer focus:outline-none font-bold bg-[var(--luna-card)]"
-                            style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}
-                        >
-                            <option value="all">All Modalities</option>
-                            <option value="RECORD">Medical Records</option>
-                            <option value="PRESCRIPTION">E-Prescriptions</option>
-                        </select>
-                        <Filter className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 opacity-30 pointer-events-none" />
-                    </div>
+
 
                     {isAdminOrClinical && (
                         <div className="flex gap-2">
@@ -178,21 +184,17 @@ const RecordsPage = ({ user }) => {
                 </div>
             </div>
 
-            {/* Zero-Noise Pulse Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* Institutional Stats Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                    { label: 'Total Vault Entries', value: stats.total, color: 'var(--luna-primary)', icon: ShieldCheck },
-                    { label: 'Clinical Dossiers', value: stats.records, color: 'var(--luna-primary)', icon: FileText },
-                    { label: 'Active Prescriptions', value: stats.prescriptions, color: 'var(--luna-primary)', icon: Pill },
-                    { label: 'Today\'s Syncs', value: stats.today, color: '#f59e0b', icon: Activity },
+                    { label: 'Total Records', value: stats.total, color: '#1e3a8a' },
+                    { label: 'Diagnoses', value: stats.records, color: '#f59e0b' },
+                    { label: 'Prescriptions', value: stats.prescriptions, color: '#ef4444' },
+                    { label: 'Recent Updates', value: stats.today, color: '#4338ca' },
                 ].map((s, i) => (
-                    <div key={i} className="p-4 rounded-xl border shadow-sm transition-all hover:translate-y-[-2px]" 
-                         style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                        <div className="flex items-center justify-between mb-2">
-                            <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-30" style={{ color: 'var(--luna-text-main)' }}>{s.label}</p>
-                            <s.icon className="w-3.5 h-3.5 opacity-20" />
-                        </div>
-                        <h3 className="text-2xl font-black tracking-tighter" style={{ color: s.color, fontFamily: "'Inter', sans-serif" }}>{loading ? '...' : s.value}</h3>
+                    <div key={i} className="p-4 border rounded-xl" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-1" style={{ fontFamily: "'Inter', sans-serif" }}>{s.label}</p>
+                        <p className="text-2xl font-extrabold" style={{ color: s.color, fontFamily: "'Inter', sans-serif" }}>{loading ? '...' : s.value}</p>
                     </div>
                 ))}
             </div>
@@ -204,7 +206,6 @@ const RecordsPage = ({ user }) => {
                         <thead>
                             <tr style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderBottom: '1px solid var(--luna-border)' }}>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'var(--luna-text-dim)' }}>Patient</th>
-                                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden md:table-cell" style={{ color: 'var(--luna-text-dim)' }}>Category</th>
                                 <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden md:table-cell" style={{ color: 'var(--luna-text-dim)' }}>Clinical Insight</th>
                                 <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden md:table-cell" style={{ color: 'var(--luna-text-dim)' }}>Date</th>
                                 <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'var(--luna-text-dim)' }}>Actions</th>
@@ -247,16 +248,7 @@ const RecordsPage = ({ user }) => {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-4 py-4 hidden md:table-cell">
-                                        <div className="flex items-center gap-2">
-                                            <div className={`p-1.5 rounded-md border ${item.__type === 'RECORD' ? 'bg-teal-500/10 border-teal-500/20 text-teal-500' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-500'}`}>
-                                                {item.__icon}
-                                            </div>
-                                            <span className="text-[10px] font-black uppercase tracking-widest leading-none">
-                                                {item.__type}
-                                            </span>
-                                        </div>
-                                    </td>
+
 
                                     <td className="px-4 py-4 hidden md:table-cell">
                                         <p className="font-bold text-[13px]" style={{ color: 'var(--luna-text-main)' }}>
@@ -287,10 +279,13 @@ const RecordsPage = ({ user }) => {
                                                 </button>
                                             )}
                                             <button 
-                                                className="p-2 rounded-lg border bg-[var(--luna-card)] border-blue-500/30 text-blue-500 hover:bg-blue-500/10 transition-all hover:-translate-y-0.5 shadow-sm opacity-40 hover:opacity-100">
+                                                onClick={() => handleDownload(item)}
+                                                title="Print Clinical Record"
+                                                className="p-2 rounded-lg border bg-[var(--luna-card)] border-blue-500/30 text-blue-500 hover:bg-blue-500/10 transition-all hover:-translate-y-0.5 shadow-sm">
                                                 <Printer className="w-4 h-4" />
                                             </button>
                                             <button 
+                                                title="Archive Record"
                                                 className="p-2 rounded-lg border bg-[var(--luna-card)] border-rose-500/30 text-rose-500 hover:bg-rose-500/10 transition-all hover:-translate-y-0.5 shadow-sm opacity-40 hover:opacity-100">
                                                 <Trash2 className="w-4 h-4" />
                                             </button>

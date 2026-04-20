@@ -32,6 +32,8 @@ const ResourceList = ({ type, title, user }) => {
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
     const [inputModal, setInputModal] = useState({ open: false, mode: 'create', item: null });
     const [detailsModal, setDetailsModal] = useState({ open: false, item: null });
+    const [apptModal, setApptModal] = useState({ open: false, patient: null });
+    const [availableSlots, setAvailableSlots] = useState({});
     const colCount = type === 'doctors' ? 6 : (isDoctor ? 5 : 6);
 
     useEffect(() => {
@@ -186,6 +188,45 @@ const ResourceList = ({ type, title, user }) => {
             toast.error(errorMsg, { id: 'save' });
         }
     };
+    const handleModalFieldChange = async (key, val, allValues) => {
+        const date = allValues.date;
+        const doctorId = user.doctor_id;
+        if (date && doctorId) {
+            try {
+                const res = await api.get(`appointments/check_availability/?doctor=${doctorId}&date=${date}`);
+                setAvailableSlots(res.data.slots || {});
+            } catch (e) { console.error("Slot check failure:", e); }
+        }
+    };
+
+    const generateTimeOptions = () => {
+        const options = [];
+        for (let h = 8; h < 20; h++) {
+            for (let m of [0, 30]) {
+                const clock = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                const occupancy = availableSlots[clock] || 0;
+                if (occupancy < 3) {
+                    options.push({ 
+                        value: clock, 
+                        label: (
+                            <div className="flex flex-col items-center justify-center py-2 px-1">
+                                <span className="text-[15px] font-black tracking-tighter" style={{ color: 'var(--luna-text-main)' }}>{clock}</span>
+                                <div className="mt-2 w-full h-[3px] rounded-full overflow-hidden flex gap-[2px] bg-slate-500/10">
+                                    {[1, 2, 3].map(i => (
+                                        <div key={i} className={`flex-1 transition-all duration-300 ${i <= (3 - occupancy) ? 'bg-[var(--luna-blue)]' : 'bg-transparent'}`} />
+                                    ))}
+                                </div>
+                                <span className="text-[7.5px] font-bold opacity-30 mt-2 tracking-[0.05em]" style={{ fontFamily: "'Inter', sans-serif" }}>
+                                    {3 - occupancy} SLOTS AVAILABLE
+                                </span>
+                            </div>
+                        )
+                    });
+                }
+            }
+        }
+        return options;
+    };
 
     const filterOptions = React.useMemo(() => {
         if (type === 'doctors') {
@@ -334,11 +375,51 @@ const ResourceList = ({ type, title, user }) => {
                 onConfirm={handleCreateEdit}
                 onCancel={() => setInputModal({ open: false, mode: 'create', item: null })}
             />
+            <InputModal
+                isOpen={apptModal.open}
+                title="Schedule New Clinical Encounter"
+                onFieldChange={handleModalFieldChange}
+                fields={[
+                    { key: 'patient_name', label: 'Authorized Patient', type: 'text', disabled: true, initialValue: apptModal.patient?.get_name || apptModal.patient?.user?.first_name },
+                    { key: 'date', label: 'Date of Encounter', type: 'date', initialValue: new Date().toISOString().split('T')[0] },
+                    { 
+                        key: 'time', 
+                        label: 'Time Slot (30m Interval)', 
+                        type: 'radio-grid',
+                        options: generateTimeOptions(),
+                        fullWidth: true
+                    },
+                    { key: 'description', label: 'Clinical Indication / Symptoms', placeholder: 'Brief description of chief complaint...', fullWidth: true }
+                ]}
+                onConfirm={(vals) => {
+                    const { date, time, description } = vals;
+                    const finalPatient = apptModal.patient.id;
+                    const finalDoctor = user.doctor_id;
+
+                    if (!date || !time || !finalPatient || !finalDoctor) {
+                        toast.error("Missing critical scheduling parameters.");
+                        return;
+                    }
+
+                    api.post('appointments/', { appointment_date: date, appointment_time: time, description: description || '', status: 'pending', patient: finalPatient, doctor: finalDoctor })
+                        .then(() => {
+                            toast.success("Encounter definitively scheduled.");
+                            setApptModal({ open: false, patient: null });
+                            setAvailableSlots({});
+                        })
+                        .catch((err) => {
+                            const errorMsg = err.response?.data?.error || "Scheduling conflict. Please verify clinical capacity.";
+                            toast.error(errorMsg);
+                        });
+                }}
+                onCancel={() => { setApptModal({ open: false, patient: null }); setAvailableSlots({}); }}
+            />
             
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
+                <div className="flex items-center gap-3">
                     <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>{title}</h1>
-                    <p className="text-[10px] font-black uppercase tracking-[0.15em] opacity-40 mt-1" style={{ color: 'var(--luna-text-muted)' }}>
+                    <div className="h-4 w-[1px] opacity-10" style={{ background: 'var(--luna-text-main)' }} />
+                    <p className="text-[10px] font-black uppercase tracking-[0.15em] opacity-40" style={{ color: 'var(--luna-text-muted)' }}>
                         {loading ? 'Decrypting records...' : `Total Registered: ${filtered.length}`}
                     </p>
                 </div>
@@ -520,26 +601,25 @@ const ResourceList = ({ type, title, user }) => {
                                             <div className="flex items-center justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
                                                 {type === 'patients' && isDoctor && (
                                                     <button onClick={() => {
-                                                        const url = `/dashboard/appointments?patient_id=${item.id}&patient_name=${encodeURIComponent(item.get_name || item.user?.first_name)}`;
-                                                        window.location.href = url;
+                                                        setApptModal({ open: true, patient: item });
                                                     }} title="Schedule Slot"
-                                                        className="px-3 py-1.5 rounded-lg border transition-all hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:-translate-y-0.5 text-[9px] font-black uppercase tracking-widest whitespace-nowrap"
-                                                        style={{ color: '#10b981', background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                                                        className="px-3 py-1.5 rounded-lg border transition-all hover:bg-[var(--luna-primary)]/10 hover:border-[var(--luna-primary)]/30 hover:-translate-y-0.5 text-[9px] font-black uppercase tracking-widest whitespace-nowrap"
+                                                        style={{ color: 'var(--luna-primary)', background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
                                                         Schedule Consult
                                                     </button>
                                                 )}
 
                                                 {canEdit && (
                                                     <button onClick={(e) => { e.stopPropagation(); setInputModal({ open: true, mode: 'edit', item }); }} title="Configure Override"
-                                                        className="p-1.5 rounded-lg border transition-all hover:bg-blue-500/10 hover:border-blue-500/30 hover:-translate-y-0.5"
-                                                        style={{ color: '#3b82f6', background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                                                        className="p-1.5 rounded-lg border transition-all hover:bg-[var(--luna-primary)]/10 hover:border-[var(--luna-primary)]/30 hover:-translate-y-0.5"
+                                                        style={{ color: 'var(--luna-primary)', background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
                                                         <Settings className="w-4 h-4" />
                                                     </button>
                                                 )}
                                                 {canDelete && (
                                                     <button onClick={(e) => { e.stopPropagation(); setConfirmDelete({ open: true, id: item.id }); }} title="Terminate Protocol"
-                                                        className="p-1.5 rounded-lg border transition-all hover:bg-red-500/10 hover:border-red-500/30 hover:-translate-y-0.5"
-                                                        style={{ color: '#ef4444', background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                                                        className="p-1.5 rounded-lg border transition-all hover:bg-[var(--luna-danger-text)]/10 hover:border-[var(--luna-danger-text)]/30 hover:-translate-y-0.5"
+                                                        style={{ color: 'var(--luna-danger-text)', background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
                                                         <Lock className="w-4 h-4" />
                                                     </button>
                                                 )}

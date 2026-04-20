@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
-    FileText, QrCode, Search, Filter, RefreshCw, Activity, 
+    FileText, QrCode, Search, Filter, RefreshCw, Activity,
     ShieldCheck, Eye, Pill, Stethoscope, Clock, Download
 } from 'lucide-react';
 import api from '../../api/axios';
@@ -16,15 +16,14 @@ const RecordsPage = ({ user }) => {
     const [prescriptions, setPrescriptions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [typeFilter, setTypeFilter] = useState('all');
-    
+
     // UI State
-    const [detailsModal, setDetailsModal] = useState({ open: false, item: null, title: 'Clinical Record' });
+    const [detailsModal, setDetailsModal] = useState({ open: false, item: null, title: 'Medical Record' });
 
     const fetchAll = async () => {
         setLoading(true);
         try {
-            const patId = user.patient_id || user.id;
+            const patId = user.patient_id;
             const [r, p] = await Promise.all([
                 api.get(`medical-records/?patient_id=${patId}`),
                 api.get(`prescriptions/?patient_id=${patId}`)
@@ -32,8 +31,8 @@ const RecordsPage = ({ user }) => {
             setRecords(r.data);
             setPrescriptions(p.data);
         } catch (err) {
-            console.error("Medical Vault Sync Failed:", err);
-            toast.error("Failed to sync personal medical vault.");
+            console.error("Medical Records Sync Failed:", err);
+            toast.error("Failed to sync medical records.");
         } finally {
             setLoading(false);
         }
@@ -45,20 +44,18 @@ const RecordsPage = ({ user }) => {
 
     const unifiedData = useMemo(() => {
         const combined = [
-            ...records.map(r => ({ ...r, __type: 'RECORD', __icon: <FileText className="w-4 h-4" /> })),
-            ...prescriptions.map(p => ({ ...p, __type: 'PRESCRIPTION', __icon: <QrCode className="w-4 h-4" /> }))
+            ...records.map(r => ({ ...r, __type: 'RECORD' })),
+            ...prescriptions.map(p => ({ ...p, __type: 'PRESCRIPTION' }))
         ];
 
         return combined.filter(item => {
-            const matchesSearch = 
+            const matchesSearch =
                 (item.diagnosis || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                 (item.qr_code_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                 (item.doctor_name || '').toLowerCase().includes(searchQuery.toLowerCase());
-            
-            const matchesType = typeFilter === 'all' || item.__type === typeFilter;
-            return matchesSearch && matchesType;
+            return matchesSearch;
         }).sort((a, b) => new Date(b.visit_date || b.created_at) - new Date(a.visit_date || a.created_at));
-    }, [records, prescriptions, searchQuery, typeFilter]);
+    }, [records, prescriptions, searchQuery]);
 
     const stats = useMemo(() => ({
         total: records.length + prescriptions.length,
@@ -67,10 +64,34 @@ const RecordsPage = ({ user }) => {
         recent: [...records, ...prescriptions].filter(i => (i.visit_date || i.created_at)?.includes(new Date().toISOString().split('T')[0])).length
     }), [records, prescriptions]);
 
-    return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pb-12 max-w-7xl mx-auto">
-            <Toaster position="top-right" />
+    const handleDownload = async (item) => {
+        const endpoint = item.__type === 'RECORD' ? 'medical-records' : 'prescriptions';
+        try {
+            toast.loading("Generating institutional transcript...", { id: 'pdf-gen' });
+            const response = await api.get(`${endpoint}/${item.id}/generate_pdf/`, {
+                responseType: 'blob'
+            });
             
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            const filename = item.__type === 'RECORD' ? `Clinical_Record_${item.id}.pdf` : `Prescription_${item.qr_code_id || item.id}.pdf`;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            toast.success("Transcript downloaded successfully.", { id: 'pdf-gen' });
+        } catch (err) {
+            console.error("PDF Generation Failed:", err);
+            toast.error("Failed to generate clinical transcript.", { id: 'pdf-gen' });
+        }
+    };
+
+    return (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+            <Toaster position="top-right" />
+
             <DetailsModal
                 isOpen={detailsModal.open}
                 title={detailsModal.title}
@@ -78,152 +99,118 @@ const RecordsPage = ({ user }) => {
                 onCancel={() => setDetailsModal({ open: false, item: null })}
             />
 
-            {/* Institutional Header Row */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Medical History</h1>
-                    <div className="flex items-center gap-3 mt-1">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40" style={{ color: 'var(--luna-text-muted)' }}>
-                            View your medical records and prescriptions
-                        </p>
-                        <div className="w-1 h-1 rounded-full opacity-20" style={{ background: 'var(--luna-text-main)' }} />
-                        <button onClick={fetchAll} className={`p-1 opacity-40 hover:opacity-100 transition-all ${loading ? 'animate-spin' : ''}`}>
-                             <RefreshCw className="w-3 h-3" />
-                         </button>
-                    </div>
+            {/* Institutional Header */}
+            <header className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 px-2">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-xl font-bold tracking-tight">Medical Records</h1>
+                    <button onClick={fetchAll} className={`p-1 opacity-40 hover:opacity-100 transition-all ${loading ? 'animate-spin' : ''}`}>
+                        <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative group">
+                <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                    <div className="relative w-full md:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-30" />
-                        <input
+                        <input 
+                            type="text"
+                            placeholder="Search clinical records..."
                             value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            placeholder="Search vault..."
-                            className="pl-9 pr-3 py-2 text-xs border rounded-lg outline-none transition-all w-full md:w-56 font-bold bg-[var(--luna-card)]"
-                            style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 text-xs border rounded-xl focus:outline-none transition-all shadow-sm bg-[var(--luna-card)]"
+                            style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-main)' }}
                         />
                     </div>
-
-                    <div className="relative">
-                        <select
-                            value={typeFilter}
-                            onChange={(e) => setTypeFilter(e.target.value)}
-                            className="pl-3 pr-8 py-2 text-xs border rounded-lg appearance-none cursor-pointer focus:outline-none font-bold bg-[var(--luna-card)]"
-                            style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}
-                        >
-                            <option value="all">All Items</option>
-                            <option value="RECORD">Medical Records</option>
-                            <option value="PRESCRIPTION">Prescriptions</option>
-                        </select>
-                        <Filter className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 opacity-30 pointer-events-none" />
-                    </div>
                 </div>
-            </div>
+            </header>
 
-            {/* Patient Stats Row */}
+            {/* Minimal Stats Row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                    { label: 'Vault Items', value: stats.total, color: 'var(--luna-teal)', icon: ShieldCheck },
-                    { label: 'Diagnoses', value: stats.records, color: '#10b981', icon: FileText },
-                    { label: 'Prescriptions', value: stats.prescriptions, color: '#6366f1', icon: Pill },
-                    { label: 'Recent Events', value: stats.recent, color: '#f59e0b', icon: Activity },
+                    { label: 'Total Files', value: stats.total, color: 'var(--luna-teal)' },
+                    { label: 'Assessments', value: stats.records, color: '#f59e0b' },
+                    { label: 'Prescriptions', value: stats.prescriptions, color: '#ef4444' },
+                    { label: 'Recent', value: stats.recent, color: '#6366f1' },
                 ].map((s, i) => (
-                    <div key={i} className="p-4 rounded-xl border shadow-sm transition-all hover:translate-y-[-2px]" 
-                         style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                        <div className="flex items-center justify-between mb-2">
-                            <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-30" style={{ color: 'var(--luna-text-main)' }}>{s.label}</p>
-                            <s.icon className="w-3.5 h-3.5 opacity-20" />
-                        </div>
-                        <h3 className="text-2xl font-black tracking-tighter" style={{ color: s.color, fontFamily: "'Inter', sans-serif" }}>{loading ? '...' : s.value}</h3>
+                    <div key={i} className="p-4 border rounded-xl" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-1" style={{ fontFamily: "'Inter', sans-serif" }}>{s.label}</p>
+                        <p className="text-2xl font-extrabold" style={{ color: s.color, fontFamily: "'Inter', sans-serif" }}>{s.value}</p>
                     </div>
                 ))}
             </div>
 
-            {/* Registry Table */}
-            <div className="rounded-xl border overflow-hidden shadow-sm" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                <div className="overflow-x-auto custom-scrollbar">
+            {/* Medical Records List */}
+            <div className="border rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderBottom: '1px solid var(--luna-border)' }}>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--luna-text-dim)' }}>Clinical Event</th>
-                                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--luna-text-dim)' }}>Modality</th>
-                                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--luna-text-dim)' }}>Issuing Practitioner</th>
-                                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--luna-text-dim)' }}>Timestamp</th>
-                                <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--luna-text-dim)' }}>Access</th>
+                            <tr className="border-b" style={{ borderColor: 'var(--luna-border)', background: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc' }}>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Record Type</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Doctor</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Date</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-right" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 Array(6).fill(0).map((_, i) => (
                                     <tr key={i} className="border-b" style={{ borderColor: 'var(--luna-border)' }}>
-                                        <td colSpan="5" className="px-6 py-6 animate-pulse opacity-40 text-center text-[10px] font-black uppercase tracking-widest">Decrypting Personal Records...</td>
+                                        <td colSpan="4" className="px-6 py-8 animate-pulse text-center opacity-40 text-xs font-bold uppercase tracking-widest">
+                                            Loading medical records...
+                                        </td>
                                     </tr>
                                 ))
                             ) : unifiedData.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="text-center py-28" style={{ color: 'var(--luna-text-main)' }}>
+                                    <td colSpan="4" className="py-28 text-center" style={{ color: 'var(--luna-text-main)' }}>
                                         <div className="flex flex-col items-center">
-                                            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-3 border border-white/5 opacity-20">
-                                                <Search className="w-6 h-6" />
-                                            </div>
-                                            <h3 className="text-sm font-bold tracking-[0.2em] opacity-40 uppercase mb-1">No Results Found</h3>
-                                            <p className="text-xs font-semibold opacity-30 max-w-[320px] leading-relaxed">
-                                                No matches found. Please try a different search term.
-                                            </p>
+                                            <FileText className="w-12 h-12 opacity-10 mb-4" />
+                                            <h3 className="text-sm font-bold tracking-[0.2em] opacity-40 uppercase">Vault Empty</h3>
+                                            <p className="text-xs font-semibold opacity-30 mt-1">No clinical records found in your profile.</p>
                                         </div>
                                     </td>
                                 </tr>
                             ) : unifiedData.map((item, i) => (
-                                <tr key={i} className="group hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b last:border-0" style={{ borderColor: 'var(--luna-border)' }}>
+                                <tr key={i} className="border-b hover:bg-[var(--luna-navy)] transition-colors" style={{ borderColor: 'var(--luna-border)' }}>
                                     <td className="px-6 py-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-lg flex items-center justify-center border font-black text-xs shadow-inner"
-                                                style={{ background: 'var(--luna-navy)', borderColor: 'var(--luna-border)', color: 'var(--luna-text-main)' }}>
-                                                {item.__type === 'RECORD' ? <FileText className="w-4 h-4 opacity-40"/> : <QrCode className="w-4 h-4 opacity-40"/>}
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-lg flex items-center justify-center border shrink-0 bg-[var(--luna-navy)] border-[var(--luna-border)]">
+                                                {item.__type === 'RECORD' ? <FileText className="w-4 h-4 opacity-40" /> : <QrCode className="w-4 h-4 opacity-40" />}
                                             </div>
-                                            <div className="flex flex-col">
-                                                <p className="font-extrabold text-[14px] leading-tight" style={{ color: 'var(--luna-text-main)' }}>
-                                                    {item.__type === 'RECORD' ? (item.diagnosis || 'Clinical Assessment') : 'Digital Prescription'}
+                                            <div>
+                                                <p className="font-semibold text-sm">
+                                                    {item.__type === 'RECORD' ? (item.diagnosis || 'Assessment') : 'Prescription'}
                                                 </p>
-                                                {item.__type === 'PRESCRIPTION' && (
-                                                    <p className="text-[8px] font-black opacity-40 uppercase tracking-widest mt-1">HASH: {item.qr_code_id}</p>
-                                                )}
+                                                <p className="text-[9px] opacity-40 uppercase font-black tracking-widest">
+                                                    {item.__type === 'RECORD' ? 'Doctor Report' : `HASH: ${item.qr_code_id}`}
+                                                </p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-4 py-4">
-                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md border ${item.__type === 'RECORD' ? 'bg-teal-500/10 border-teal-500/20 text-teal-500' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-500'}`}>
-                                            {item.__type}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-4">
+                                    <td className="px-6 py-4 hidden sm:table-cell">
                                         <div className="flex items-center gap-2">
                                             <div className="w-6 h-6 rounded-full flex items-center justify-center border bg-[var(--luna-navy)] border-[var(--luna-border)]">
                                                 <Stethoscope className="w-3 h-3 opacity-40" />
                                             </div>
-                                            <span className="text-[12px] font-bold" style={{ color: 'var(--luna-text-main)' }}>Dr. {item.doctor_name || 'Specialist'}</span>
+                                            <span className="text-[12px] font-bold">Dr. {item.doctor_name || 'Staff'}</span>
                                         </div>
                                     </td>
-                                    <td className="px-4 py-4">
+                                    <td className="px-6 py-4 hidden sm:table-cell">
                                         <div className="flex flex-col">
-                                            <span className="text-[12px] font-black" style={{ color: 'var(--luna-text-main)' }}>{item.visit_date || item.created_at?.split('T')[0]}</span>
-                                            <div className="flex items-center gap-1 mt-0.5 opacity-40">
-                                                <Clock className="w-2.5 h-2.5" />
-                                                <span className="text-[9px] font-bold uppercase">Official Sync</span>
-                                            </div>
+                                            <span className="text-xs font-bold">{item.visit_date || item.created_at?.split('T')[0]}</span>
+                                            <span className="text-[9px] font-black opacity-30 uppercase tracking-widest mt-0.5">Secure Sync</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 pr-6">
-                                        <div className="flex items-center justify-end gap-1.5">
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex items-center justify-end gap-2">
                                             <button 
-                                                onClick={() => setDetailsModal({ open: true, item, title: item.__type === 'RECORD' ? 'Clinical Assessment Details' : 'Prescription Metadata' })}
-                                                title="View Detailed Logs"
-                                                className="p-2 rounded-lg border bg-[var(--luna-card)] border-teal-500/30 text-teal-500 hover:bg-teal-500/10 transition-all hover:-translate-y-0.5 shadow-sm">
+                                                onClick={() => setDetailsModal({ open: true, item, title: item.__type === 'RECORD' ? 'Assessment Details' : 'Prescription Details' })}
+                                                className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors opacity-40 hover:opacity-100"
+                                            >
                                                 <Eye className="w-4 h-4" />
                                             </button>
                                             <button 
-                                                className="p-2 rounded-lg border bg-[var(--luna-card)] border-blue-500/30 text-blue-500 hover:bg-blue-500/10 transition-all hover:-translate-y-0.5 shadow-sm opacity-40 hover:opacity-100">
+                                                onClick={() => handleDownload(item)}
+                                                className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors opacity-40 hover:opacity-100">
                                                 <Download className="w-4 h-4" />
                                             </button>
                                         </div>
@@ -234,12 +221,12 @@ const RecordsPage = ({ user }) => {
                     </table>
                 </div>
             </div>
-            <div className="text-center opacity-30 mt-8">
-                <p className="text-[9px] font-black uppercase tracking-[0.3em]">End-to-End Encrypted Clinical Vault • Lifeline HMS</p>
-            </div>
+
+            <footer className="text-center pb-10">
+                <p className="text-[10px] font-bold uppercase tracking-widest opacity-20">Secured Medical Records Vault</p>
+            </footer>
         </motion.div>
     );
 };
 
 export default RecordsPage;
-

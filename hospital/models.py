@@ -337,10 +337,11 @@ from django.dispatch import receiver
 @receiver(post_save, sender=Appointment)
 def notify_appointment(sender, instance, created, **kwargs):
     if created:
+        time_str = instance.appointment_time.strftime('%H:%M') if hasattr(instance.appointment_time, 'strftime') else str(instance.appointment_time)
         if instance.doctor and getattr(instance.doctor, 'user', None):
-            Notification.objects.create(user=instance.doctor.user, title="New Clinical Appointment", message=f"Patient {instance.patientName} scheduled a consultation on {instance.appointment_date}.", notification_type="appointment")
+            Notification.objects.create(user=instance.doctor.user, title="New Clinical Appointment", message=f"Patient {instance.patientName} scheduled a consultation on {instance.appointment_date} at {time_str}.", notification_type="appointment")
         if instance.patient and getattr(instance.patient, 'user', None):
-            Notification.objects.create(user=instance.patient.user, title="Appointment Request Confirmed", message=f"Your appointment with Dr. {instance.doctor.get_name} is locked in for {instance.appointment_date}.", notification_type="appointment")
+            Notification.objects.create(user=instance.patient.user, title="Appointment Request Confirmed", message=f"Your appointment with Dr. {instance.doctor.get_name} is locked in for {instance.appointment_date} at {time_str}.", notification_type="appointment")
 
 @receiver(post_save, sender=TeleConsultationSession)
 def notify_tele_session(sender, instance, created, **kwargs):

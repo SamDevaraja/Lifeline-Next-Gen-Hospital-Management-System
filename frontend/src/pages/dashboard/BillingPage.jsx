@@ -26,7 +26,7 @@ const BillingPage = ({ user }) => {
         setLoading(true);
         try {
             let url = 'bills/';
-            if (user?.role === 'patient') url += `?patient_id=${user.id}`;
+            if (user?.role === 'patient') url += `?patient_id=${user.patient_id || user.id}`;
             const res = await api.get(url);
             setBills(res.data);
         } catch (err) {
@@ -183,16 +183,15 @@ const BillingPage = ({ user }) => {
             {/* Mini Stats Row - Pulse Grid Pattern (Records 1:1) */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                    { label: 'Total Revenue', value: '₹' + (stats.revenue / 1000).toFixed(1) + 'k', color: 'var(--luna-teal)' },
+                    { label: 'Total Revenue', value: '₹' + (stats.revenue / 1000).toFixed(1) + 'k', color: '#1e3a8a' },
                     { label: 'Pending Collection', value: '₹' + (stats.pending / 1000).toFixed(1) + 'k', color: '#f59e0b' },
-                    { label: 'Today Invoiced', value: '₹' + (stats.paidToday / 1000).toFixed(1) + 'k', color: '#10b981' },
-                    { label: 'Active Ledger', value: stats.count, color: '#6366f1' },
+                    { label: 'Today Invoiced', value: '₹' + (stats.paidToday / 1000).toFixed(1) + 'k', color: '#ef4444' },
+                    { label: 'Active Ledger', value: stats.count, color: '#4338ca' },
                 ].map((s, i) => (
-                    <div key={i} className="p-4 border rounded-xl shadow-sm bg-[var(--luna-card)]" style={{ borderColor: 'var(--luna-border)' }}>
+                    <div key={i} className="p-4 border rounded-xl" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
                         <p className="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-1" style={{ fontFamily: "'Inter', sans-serif" }}>{s.label}</p>
-                        <p className="text-2xl font-bold" style={{ color: s.color, fontFamily: "'Inter', sans-serif" }}>{s.value}</p>
+                        <p className="text-2xl font-extrabold" style={{ color: s.color, fontFamily: "'Inter', sans-serif" }}>{loading ? '...' : s.value}</p>
                     </div>
-
                 ))}
             </div>
 
@@ -257,8 +256,8 @@ const BillingPage = ({ user }) => {
                                     </td>
                                     <td className="px-4 py-4 text-center hidden sm:table-cell">
                                         <span className={`px-3 py-1 rounded-md border text-[9px] font-bold uppercase tracking-widest ${
-                                            b.status === 'paid' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 
-                                            'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
+                                            b.status === 'paid' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 
+                                            'bg-slate-500/10 text-slate-500 border-slate-500/20'}`}>
                                             {b.status}
                                         </span>
                                     </td>
@@ -279,7 +278,7 @@ const BillingPage = ({ user }) => {
                                             </button>
                                             <button onClick={() => handleDownloadPDF(b.id, b.invoice_number)} 
                                                 title="Download PDF"
-                                                className="p-1.5 rounded-lg border bg-[var(--luna-card)] border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 transition-all hover:-translate-y-0.5 shadow-sm">
+                                                className="p-1.5 rounded-lg border bg-[var(--luna-card)] border-blue-500/30 text-blue-500 hover:bg-blue-500/10 transition-all hover:-translate-y-0.5 shadow-sm">
                                                 <Download className="w-4 h-4" />
                                             </button>
                                         </div>

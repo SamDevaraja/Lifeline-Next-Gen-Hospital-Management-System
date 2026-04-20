@@ -8,7 +8,7 @@ import { LUNA } from "./Constants";
 const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel, type = 'danger' }) => {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onCancel} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
             <motion.div initial={{ scale: 0.98, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.98, opacity: 0, y: 10 }}
                 className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl border relative z-10"
@@ -68,7 +68,7 @@ const InputModal = ({ isOpen, title, fields, onConfirm, onCancel, onFieldChange 
     };
 
     return (
-        <div className="fixed inset-0 z-[101] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onCancel} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
             <motion.div initial={{ scale: 0.98, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.98, opacity: 0, y: 10 }}
                 className="w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl border relative z-10 flex flex-col"
@@ -201,7 +201,7 @@ const DetailsModal = ({ isOpen, title, data, onCancel }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[115] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onCancel} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
             <motion.div initial={{ scale: 0.98, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.98, opacity: 0, y: 10 }}
                 className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border relative z-10 flex flex-col"
@@ -237,7 +237,28 @@ const DetailsModal = ({ isOpen, title, data, onCancel }) => {
                 </div>
             </motion.div>
         </div>
+    )};
+
+const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <motion.div initial={{ scale: 0.98, opacity: 0, y: 10 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.98, opacity: 0, y: 10 }}
+                className={`w-full ${maxWidth} rounded-2xl overflow-hidden shadow-2xl border relative z-10 flex flex-col`}
+                style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                <div className="px-8 py-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--luna-border)' }}>
+                    <h3 className="text-lg font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>{title}</h3>
+                    <button onClick={onClose} className="p-1.5 hover:bg-black/5 rounded-lg transition-all opacity-40 hover:opacity-100">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="p-8 overflow-y-auto max-h-[85vh] custom-scrollbar">
+                    {children}
+                </div>
+            </motion.div>
+        </div>
     );
 };
 
-export { ConfirmModal, InputModal, DetailsModal };
+export { ConfirmModal, InputModal, DetailsModal, Modal };

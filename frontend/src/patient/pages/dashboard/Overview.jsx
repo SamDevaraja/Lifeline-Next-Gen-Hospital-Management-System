@@ -6,7 +6,7 @@ import {
     FileText, Bell, DollarSign, Stethoscope, BrainCircuit,
     BarChart3, AlertCircle, CheckCircle, Clock, X, Menu,
     Video, Pill, FlaskConical, Smartphone, QrCode, User, Mic, ArrowRight, Sun, Moon, Globe, ChevronDown, Filter,
-    Mail, Lock, ShieldCheck
+    Mail, Lock, ShieldCheck, RefreshCw
 } from 'lucide-react';
 import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart, Line } from 'recharts';
@@ -73,7 +73,7 @@ const DoctorOverview = ({ user }) => {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 max-w-7xl mx-auto">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Clinical Workspace</h1>
+                    <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Doctor's Dashboard</h1>
                     <p className="font-bold text-sm mt-1" style={{ color: 'var(--luna-text-main)', opacity: 0.8 }}>Welcome back, Dr. {user.last_name}</p>
                 </div>
                 <div className="badge-live scale-90">Dept: {user.department}</div>
@@ -81,9 +81,9 @@ const DoctorOverview = ({ user }) => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {[
-                    { label: 'My Patients', value: stats?.total_patients || 0, icon: <Users className="w-5 h-5" />, color: LUNA.teal },
-                    { label: 'Today Sched', value: stats?.today_appointments || 0, icon: <Calendar className="w-5 h-5" />, color: '#6366f1' },
-                    { label: 'Ward Occupancy', value: stats?.ward_occupancy || 'Optimal', icon: <Stethoscope className="w-5 h-5" />, color: '#f59e0b' },
+                    { label: 'My Patients', value: stats?.total_patients || 0, icon: <Users className="w-5 h-5" />, color: LUNA.blue },
+                    { label: 'Today Sched', value: stats?.today_appointments || 0, icon: <Calendar className="w-5 h-5" />, color: LUNA.blue },
+                    { label: 'Ward Occupancy', value: stats?.ward_occupancy || 'Optimal', icon: <Stethoscope className="w-5 h-5" />, color: LUNA.blue },
                 ].map((s, i) => (
                     <div key={i} className="card-clinical p-6 flex flex-col justify-between group">
                         <div className="flex items-center justify-between mb-4">
@@ -123,222 +123,152 @@ const DoctorOverview = ({ user }) => {
                 </div>
                 <div className="card shadow-sm flex flex-col items-center justify-center text-center p-10" style={{ border: '1px solid var(--luna-border)', background: 'var(--luna-card)' }}>
                     <ShieldCheck className="w-12 h-12 text-teal-400 mb-4 animate-pulse" />
-                    <h2 className="text-lg font-black" style={{ color: 'var(--luna-text-main)' }}>Secured Institutional Protocol</h2>
+                    <h2 className="text-lg font-black" style={{ color: 'var(--luna-text-main)' }}>System Status</h2>
                     <p className="text-[13px] font-bold mt-3 uppercase tracking-tighter max-w-[200px]" style={{ color: 'var(--luna-text-main)', opacity: 0.9 }}>Manual physician-led clinical review system is locked and synchronized.</p>
                 </div>
             </div>
         </motion.div>
     );
 };
-
 // ── Patient Overview ──
 const PatientOverview = ({ user }) => {
     const navigate = useNavigate();
+    const { theme } = useTheme();
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [apps, bills, records] = await Promise.all([
+                api.get(`/appointments/?patient_id=${user.patient_id}`),
+                api.get(`/bills/?patient_id=${user.patient_id}`),
+                api.get(`/medical-records/?patient_id=${user.patient_id}`)
+            ]);
+            setStats({ 
+                appointments: Array.isArray(apps.data) ? apps.data : [],
+                bills: Array.isArray(bills.data) ? bills.data : [],
+                records: Array.isArray(records.data) ? records.data : []
+            });
+        } catch (err) { 
+            console.error(err); 
+            toast.error("Failed to sync your dashboard.");
+        } finally { 
+            setLoading(false); 
+        }
+    };
+
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [apps, bills] = await Promise.all([
-                    api.get(`/appointments/?patient_id=${user.patient_id}`),
-                    api.get(`/bills/?patient_id=${user.patient_id}`)
-                ]);
-                setStats({ appointments: apps.data, bills: bills.data });
-            } catch (err) { console.error(err); }
-            finally { setLoading(false); }
-        };
         fetchData();
     }, [user.patient_id]);
 
     const unpaidBills = stats?.bills?.filter(b => b.status === 'pending') || [];
     const nextApp = stats?.appointments?.find(a => a.status === 'confirmed');
 
-    const statusBadges = [
+    const metrics = [
         { label: 'Health Status', value: 'Active', color: 'var(--luna-teal)' },
-        { label: 'Next Appointment', value: nextApp ? nextApp.appointment_date : 'None', color: 'var(--luna-blue)' },
-        { label: 'Due Amount', value: `₹${unpaidBills.reduce((acc, b) => acc + parseFloat(b.total_amount), 0).toLocaleString()}`, color: 'var(--luna-danger-text)' },
+        { label: 'Next Visit', value: nextApp ? nextApp.appointment_date : 'N/A', color: 'var(--luna-blue)' },
+        { label: 'Due Balance', value: `₹${unpaidBills.reduce((acc, b) => acc + parseFloat(b.total_amount), 0).toLocaleString()}`, color: '#ef4444' },
+        { label: 'Medical Records', value: stats?.records?.length || 0, color: '#6366f1' },
     ];
 
     return (
-        <div className="w-full max-w-7xl mx-auto space-y-10 pb-20 px-4">
-            {/* Header: CLEAN & MINIMAL (NOTIFICATION STYLE) */}
-            <header className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-12 pb-6 border-b" style={{ borderColor: 'var(--luna-border)' }}>
-                <div className="flex flex-col gap-1">
-                    <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>
-                        My Health Dashboard
-                    </h1>
-                    <div className="flex items-center gap-3">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">
-                            Patient ID: <span style={{ color: 'var(--luna-teal)' }}>LFLN-{user.patient_id?.toString().padStart(5, '0')}</span>
-                        </p>
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 animate-pulse" />
-                            <span className="text-[9px] font-black uppercase tracking-widest opacity-30">Live Connection Stable</span>
-                        </div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+            <Toaster position="top-right" />
+            
+            {/* Institutional Header */}
+            <header className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">Dashboard Overview</h1>
+                    <button onClick={fetchData} className={`p-1 opacity-40 hover:opacity-100 transition-all ${loading ? 'animate-spin' : ''}`}>
+                        <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="flex items-center gap-2 ml-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400/80 animate-pulse" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest opacity-30">Active</span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-6">
-                    {statusBadges.map((s, i) => (
-                        <div key={i} className="flex flex-col items-end">
-                            <span className="text-[9px] font-black uppercase tracking-widest opacity-30">{s.label}</span>
-                            <span className="text-[11px] font-black uppercase tracking-wider font-mono" style={{ color: s.color }}>{s.value}</span>
-                        </div>
-                    ))}
+                <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">
+                        Patient ID: <span style={{ color: 'var(--luna-teal)' }}>LFLN-{user.patient_id?.toString().padStart(5, '0')}</span>
+                    </p>
                 </div>
             </header>
 
-            {/* Main Content Feed */}
-            <main className="space-y-10">
-                {/* 1. Important Updates & Actions */}
-                <section className="space-y-4">
-                    <h2 className="text-[10px] font-black uppercase tracking-[0.25em] opacity-40 mb-6 flex items-center gap-2">
-                        <Bell className="w-3 h-3" /> Recent Updates & Actions
-                    </h2>
-                    
-                    <div className="space-y-px border rounded-2xl overflow-hidden shadow-2xl" 
-                         style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                        
-                        {/* Appointment Item */}
-                        <div onClick={() => navigate('/patient/dashboard/appointments')}
-                             className="group p-5 flex items-center justify-between border-b cursor-pointer transition-all hover:bg-white/[0.02]"
-                             style={{ borderColor: 'var(--luna-border)' }}>
-                            <div className="flex items-center gap-5">
-                                <div className="p-3 rounded-2xl bg-teal-500/10 text-teal-500 shadow-inner group-hover:scale-110 transition-transform">
-                                    <Calendar className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border border-teal-500/30 text-teal-500 bg-teal-500/5">Appointment</span>
-                                        <h3 className="text-sm font-bold" style={{ color: 'var(--luna-text-main)' }}>Upcoming Doctor Visit</h3>
-                                    </div>
-                                    <p className="text-xs font-bold opacity-60 max-w-md" style={{ color: 'var(--luna-text-muted)' }}>
-                                        {nextApp ? `Your visit with Dr. ${nextApp.doctor_name || nextApp.doctorName} is confirmed.` : 'No upcoming doctor visits scheduled.'}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-1.5 min-w-[120px]">
-                                <span className="text-[10px] font-black font-mono opacity-40">{nextApp?.appointment_date || 'N/A'}</span>
-                                <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-navy)', color: 'var(--luna-text-muted)' }}>View Details</span>
-                            </div>
-                        </div>
-
-                        {/* Financial Item */}
-                        <div onClick={() => navigate('/patient/dashboard/billing')}
-                             className="group p-5 flex items-center justify-between border-b cursor-pointer transition-all hover:bg-white/[0.02]"
-                             style={{ borderColor: 'var(--luna-border)' }}>
-                            <div className="flex items-center gap-5">
-                                <div className="p-3 rounded-2xl bg-rose-500/10 text-rose-500 shadow-inner group-hover:scale-110 transition-transform">
-                                    <DollarSign className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border border-rose-500/30 text-rose-500 bg-rose-500/5">Billing</span>
-                                        <h3 className="text-sm font-bold" style={{ color: 'var(--luna-text-main)' }}>Outstanding Bills</h3>
-                                    </div>
-                                    <p className="text-xs font-bold opacity-60 max-w-md" style={{ color: 'var(--luna-text-muted)' }}>
-                                        {unpaidBills.length > 0 ? `You have ${unpaidBills.length} unpaid medical bills.` : 'All your medical bills have been cleared.'}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-1.5 min-w-[120px]">
-                                <span className="text-[10px] font-black font-mono text-rose-500">₹{unpaidBills.reduce((acc, b) => acc + parseFloat(b.total_amount), 0).toLocaleString()}</span>
-                                <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-navy)', color: 'var(--luna-text-muted)' }}>Pay Now</span>
-                            </div>
-                        </div>
-
-                        {/* Telemedicine Item */}
-                        <div onClick={() => navigate('/patient/dashboard/telemedicine')}
-                             className="group p-5 flex items-center justify-between cursor-pointer transition-all hover:bg-white/[0.02]">
-                            <div className="flex items-center gap-5">
-                                <div className="p-3 rounded-2xl bg-indigo-500/10 text-indigo-500 shadow-inner group-hover:scale-110 transition-transform">
-                                    <Video className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border border-indigo-500/30 text-indigo-500 bg-indigo-500/5">Virtual Visit</span>
-                                        <h3 className="text-sm font-bold" style={{ color: 'var(--luna-text-main)' }}>Video Consultation</h3>
-                                    </div>
-                                    <p className="text-xs font-bold opacity-60 max-w-md" style={{ color: 'var(--luna-text-muted)' }}>
-                                        Connect with your doctor via secure video call.
-                                    </p>
-                                </div>
-                            </div>
-                            <button className="text-[9px] font-black uppercase tracking-widest px-5 py-2.5 rounded-xl border transition-all hover:bg-[var(--luna-blue)] hover:text-white" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-navy)', color: 'var(--luna-text-muted)' }}>Launch Call</button>
-                        </div>
+            {/* Minimal Stats Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {metrics.map((s, i) => (
+                    <div key={i} className="p-3 sm:p-4 border rounded-xl overflow-hidden" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                        <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider opacity-40 mb-1 truncate" style={{ fontFamily: "'Inter', sans-serif" }}>{s.label}</p>
+                        <p className="text-lg sm:text-2xl font-extrabold whitespace-nowrap overflow-hidden text-ellipsis" style={{ color: s.color, fontFamily: "'Inter', sans-serif" }}>
+                            {loading ? '...' : s.value}
+                        </p>
                     </div>
-                </section>
+                ))}
+            </div>
 
-                {/* 2. Medical Visit History (ENHANCED UI) */}
-                <section className="space-y-6 pt-4">
-                    <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-indigo-500/10 text-indigo-500">
-                                <FileText className="w-4 h-4" />
-                            </div>
-                            <h2 className="text-[11px] font-black uppercase tracking-[0.25em] opacity-50">
-                                Recent Medical History
-                            </h2>
-                        </div>
-                        <Link to="/patient/dashboard/records" 
-                              className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-all hover:bg-white/[0.05]"
-                              style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-dim)' }}>
-                            View Full Archive
-                        </Link>
-                    </div>
-                    
-                    <div className="shadow-2xl rounded-[2rem] overflow-hidden border" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="text-[9px] uppercase font-black tracking-[0.25em]" 
-                                        style={{ color: 'var(--luna-text-muted)', background: 'var(--luna-navy)' }}>
-                                        <th className="p-6 pl-10 border-b" style={{ borderColor: 'var(--luna-border)' }}>Date & Time</th>
-                                        <th className="p-6 border-b" style={{ borderColor: 'var(--luna-border)' }}>Attending Doctor</th>
-                                        <th className="p-6 border-b" style={{ borderColor: 'var(--luna-border)' }}>Service Type</th>
-                                        <th className="p-6 text-right pr-10 border-b" style={{ borderColor: 'var(--luna-border)' }}>Status</th>
+            {/* Medical History Section */}
+            <div className="border rounded-xl overflow-hidden shadow-sm" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--luna-border)', background: theme === 'dark' ? 'rgba(255,255,255,0.01)' : '#fcfcfc' }}>
+                    <h3 className="text-[11px] font-black uppercase tracking-widest opacity-60">Medical History</h3>
+                    <button onClick={() => navigate('/patient/dashboard/records')} className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border hover:bg-white/5 transition-all" style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-dim)' }}>
+                        View Records
+                    </button>
+                </div>
+                <div className="overflow-hidden min-h-[300px]">
+                    <table className="w-full text-left border-collapse table-auto sm:table-fixed">
+                        <thead style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc' }}>
+                            <tr className="border-b" style={{ borderColor: 'var(--luna-border)' }}>
+                                <th className="pl-4 pr-2 sm:px-6 py-3 text-[9px] font-black uppercase tracking-widest opacity-40">Visit Date</th>
+                                <th className="px-2 sm:px-6 py-3 text-[9px] font-black uppercase tracking-widest opacity-40">Doctor</th>
+                                <th className="pl-2 pr-4 sm:px-6 py-3 text-[9px] font-black uppercase tracking-widest opacity-40 text-right">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                Array(4).fill(0).map((_, i) => (
+                                    <tr key={i} className="border-b" style={{ borderColor: 'var(--luna-border)' }}>
+                                        <td colSpan="3" className="px-6 py-4 animate-pulse opacity-20 text-[9px] font-bold uppercase text-center tracking-widest">Loading records...</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {(stats?.appointments || []).slice(0, 4).map((a, i) => (
-                                        <tr key={i} className="group transition-all hover:bg-white/[0.01]" style={{ borderColor: 'var(--luna-border)' }}>
-                                            <td className="p-6 pl-10 border-b group-last:border-none" style={{ borderColor: 'var(--luna-border)' }}>
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-8 h-8 rounded-lg border flex items-center justify-center bg-white/[0.02] opacity-40 group-hover:opacity-100 transition-opacity" style={{ borderColor: 'var(--luna-border)' }}>
-                                                        <Activity className="w-3.5 h-3.5" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[11px] font-black font-mono leading-none" style={{ color: 'var(--luna-text-main)' }}>{a.appointment_date}</p>
-                                                        <p className="text-[9px] font-bold opacity-30 uppercase mt-1 tracking-wider">{a.appointment_time || 'General Session'}</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="p-6 border-b group-last:border-none" style={{ borderColor: 'var(--luna-border)' }}>
-                                                <p className="text-xs font-black uppercase tracking-tight" style={{ color: 'var(--luna-text-main)' }}>
-                                                    {a.doctor_name || `DR. ${a.doctorName || 'UNASSIGNED'}`}
-                                                </p>
-                                                <p className="text-[9px] font-bold opacity-30 uppercase mt-1 tracking-wider">Medical Consultant</p>
-                                            </td>
-                                            <td className="p-6 border-b group-last:border-none" style={{ borderColor: 'var(--luna-border)' }}>
-                                                <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-md border bg-indigo-500/5 text-indigo-400" style={{ borderColor: 'var(--luna-border)' }}>
-                                                    Examination
-                                                </span>
-                                            </td>
-                                            <td className="p-6 pr-10 text-right border-b group-last:border-none" style={{ borderColor: 'var(--luna-border)' }}>
-                                                <span className={`text-[8px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border ${a.status === 'confirmed' ? 'text-teal-500 bg-teal-500/5 border-teal-500/30' : 'text-amber-500 bg-amber-500/5 border-amber-500/30'}`}>
-                                                    {a.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-            </main>
-        </div>
+                                ))
+                            ) : (stats?.appointments || []).length === 0 ? (
+                                <tr>
+                                    <td colSpan="3" className="px-6 py-12 text-center opacity-30 text-xs font-bold uppercase tracking-widest">No recent encounters found.</td>
+                                </tr>
+                            ) : (stats?.appointments || []).slice(0, 4).map((a, i) => (
+                                <tr key={i} className="border-b last:border-0 hover:bg-[var(--luna-navy)] transition-colors" style={{ borderColor: 'var(--luna-border)' }}>
+                                    <td className="pl-4 pr-2 sm:px-6 py-4">
+                                        <div className="flex items-center gap-2 sm:gap-3">
+                                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center bg-[var(--luna-navy)] border border-[var(--luna-border)] shrink-0">
+                                                <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5 opacity-40" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-[10px] sm:text-xs font-bold leading-none truncate">{a.appointment_date}</p>
+                                                <p className="text-[8px] sm:text-[9px] font-bold opacity-30 uppercase mt-1 truncate">Consultation</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-2 sm:px-6 py-4">
+                                        <p className="text-[10px] sm:text-xs font-black uppercase tracking-tight truncate">Dr. {a.doctor_name || a.doctorName}</p>
+                                        <p className="hidden sm:block text-[9px] font-bold opacity-30 uppercase truncate">Specialist</p>
+                                    </td>
+                                    <td className="pl-2 pr-4 sm:px-6 py-4 text-right">
+                                        <span className={`inline-block px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[7px] sm:text-[8px] font-black uppercase tracking-widest border ${a.status === 'confirmed' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'}`}>
+                                            {a.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <footer className="text-center pt-10 pb-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest opacity-20">Lifeline Management System</p>
+            </footer>
+        </motion.div>
     );
 };
 
@@ -365,10 +295,10 @@ const AdminOverview = () => {
     }, []);
 
     const statCards = stats ? [
-        { label: 'Total Doctors', value: stats.total_doctors, icon: <Stethoscope className="w-6 h-6" />, color: LUNA.info_text, bg: LUNA.info_bg },
+        { label: 'Total Doctors', value: stats.total_doctors, icon: <Stethoscope className="w-6 h-6" />, color: LUNA.blue, bg: LUNA.info_bg },
         { label: 'Active Patients', value: stats.total_patients, icon: <HeartPulse className="w-6 h-6" />, color: LUNA.blue, bg: LUNA.info_bg },
-        { label: 'Today Sched', value: stats.today_appointments, icon: <Calendar className="w-6 h-6" />, color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)' },
-        { label: 'Total Revenue', value: `₹${stats.total_revenue.toLocaleString()}`, icon: <DollarSign className="w-6 h-6" />, color: LUNA.success_text, bg: LUNA.success_bg },
+        { label: 'Today Sched', value: stats.today_appointments, icon: <Calendar className="w-6 h-6" />, color: LUNA.blue, bg: LUNA.info_bg },
+        { label: 'Total Revenue', value: `₹${stats.total_revenue.toLocaleString()}`, icon: <DollarSign className="w-6 h-6" />, color: LUNA.blue, bg: LUNA.info_bg },
     ] : [];
 
     return (
@@ -436,11 +366,11 @@ const AdminOverview = () => {
 // ── Staff Overview (Nurse, Receptionist, Pharmacist) ──
 const StaffOverview = ({ user }) => {
     const roleMap = {
-        receptionist: { title: 'Reception Desk', sub: 'Patient registration & scheduling operations', icon: <Users className="w-16 h-16 text-teal-500 opacity-20" /> },
+        receptionist: { title: 'Reception Desk', sub: 'Patient registration & scheduling operations', icon: <Users className="w-16 h-16 text-blue-500 opacity-20" /> },
         pharmacist: { title: 'Pharmacy Terminal', sub: 'Inventory management & prescription dispensing', icon: <Pill className="w-16 h-16 text-blue-500 opacity-20" /> },
-        nurse: { title: 'Nurse Station', sub: 'Vitals logging & clinical record tracking', icon: <HeartPulse className="w-16 h-16 text-rose-500 opacity-20" /> },
-        lab_technician: { title: 'Lab Terminal', sub: 'Diagnostic testing & reporting operations', icon: <FlaskConical className="w-16 h-16 text-purple-500 opacity-20" /> },
-        billing_staff: { title: 'Billing Desk', sub: 'Financial operations & invoice management', icon: <DollarSign className="w-16 h-16 text-emerald-500 opacity-20" /> },
+        nurse: { title: 'Nurse Station', sub: 'Vitals logging & clinical record tracking', icon: <HeartPulse className="w-16 h-16 text-blue-500 opacity-20" /> },
+        lab_technician: { title: 'Lab Terminal', sub: 'Diagnostic testing & reporting operations', icon: <FlaskConical className="w-16 h-16 text-blue-500 opacity-20" /> },
+        billing_staff: { title: 'Billing Desk', sub: 'Financial operations & invoice management', icon: <DollarSign className="w-16 h-16 text-blue-500 opacity-20" /> },
     };
     
     const roleProps = roleMap[user?.role] || { title: 'Staff Portal', sub: 'Hospital workspace interface' };

@@ -191,12 +191,12 @@ const PharmacyPage = ({ user }) => {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="border-b" style={{ borderColor: 'var(--luna-border)', background: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc' }}>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Medicine Name</th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Category</th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-center hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Stock</th>
-                                    {user?.role !== 'doctor' && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-center hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Price</th>}
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-center hidden sm:table-cell" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Status</th>
-                                    {user?.role !== 'doctor' && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-right" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Actions</th>}
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] w-[40%]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Medicine Name</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] hidden sm:table-cell w-[15%]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Category</th>
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-center hidden sm:table-cell w-[10%]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Stock</th>
+                                    {user?.role !== 'doctor' && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-center hidden sm:table-cell w-[10%]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Price</th>}
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-center hidden sm:table-cell w-[15%]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Status</th>
+                                    {user?.role !== 'doctor' && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-right w-[10%]" style={{ color: 'var(--luna-text-dim)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Actions</th>}
                                 </tr>
                             </thead>
                             <tbody>
@@ -224,7 +224,7 @@ const PharmacyPage = ({ user }) => {
                                     </tr>
                                 ) : filtered.map((m) => (
                                     <tr key={m.id} className="border-b hover:bg-[var(--luna-navy)] transition-colors" style={{ borderColor: 'var(--luna-border)' }}>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-4 w-[40%]">
                                             <div
                                                 className="flex items-center gap-3 cursor-pointer"
                                                 onClick={() => setViewModal({ open: true, item: m })}
@@ -239,15 +239,15 @@ const PharmacyPage = ({ user }) => {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 hidden sm:table-cell">
+                                        <td className="px-6 py-4 hidden sm:table-cell w-[15%]">
                                             <span className="text-[11px] font-semibold px-3 py-1 rounded-lg border capitalize shadow-sm transition-all"
                                                 style={{ background: 'var(--luna-navy)', borderColor: 'var(--luna-border)', color: 'var(--luna-text-main)' }}>
                                                 {m.category}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-center font-semibold text-sm hidden sm:table-cell">{m.stock_level}</td>
-                                        {user?.role !== 'doctor' && <td className="px-6 py-4 text-center font-semibold text-sm hidden sm:table-cell">₹{parseFloat(m.unit_price).toLocaleString()}</td>}
-                                        <td className="px-6 py-4 text-center hidden sm:table-cell">
+                                        <td className="px-6 py-4 text-center font-semibold text-sm hidden sm:table-cell w-[10%]">{m.stock_level}</td>
+                                        {user?.role !== 'doctor' && <td className="px-6 py-4 text-center font-semibold text-sm hidden sm:table-cell w-[10%]">₹{parseFloat(m.unit_price).toLocaleString()}</td>}
+                                        <td className="px-6 py-4 text-center hidden sm:table-cell w-[15%]">
                                             <span className={`${m.status === 'Critical' ? 'badge-danger' :
                                                     m.status === 'Low Stock' ? 'badge-warn' :
                                                         'badge-success'}`}
@@ -256,7 +256,7 @@ const PharmacyPage = ({ user }) => {
                                             </span>
                                         </td>
                                         {user?.role !== 'doctor' && (
-                                            <td className="px-6 py-4 text-right">
+                                            <td className="px-6 py-4 text-right w-[10%]">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button onClick={() => setItemModal({ open: true, mode: 'edit', item: m })} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors opacity-40 hover:opacity-100">
                                                         <Edit2 className="w-3.5 h-3.5" />

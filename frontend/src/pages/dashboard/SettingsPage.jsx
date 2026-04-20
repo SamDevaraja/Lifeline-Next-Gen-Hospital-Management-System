@@ -101,7 +101,7 @@ const SettingsPage = ({ user, onUpdate }) => {
             </AnimatePresence>
             <div className="max-w-3xl mx-auto w-full flex flex-col items-center text-center pb-4 border-b border-[var(--luna-border)] mb-6">
                 <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Settings Registry</h1>
-                <p className="font-bold text-[8px] uppercase opacity-30 mt-1.5" style={{ color: 'var(--luna-text-muted)', letterSpacing: '0.15em' }}>Security & Institutional Profile Management</p>
+                <p className="font-bold text-[8px] uppercase opacity-50 mt-1.5" style={{ color: 'var(--luna-text-muted)', letterSpacing: '0.15em' }}>Security & Institutional Profile Management</p>
             </div>
 
             <div className="w-full max-w-3xl mx-auto">
@@ -114,33 +114,33 @@ const SettingsPage = ({ user, onUpdate }) => {
                         </div>
 
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-teal-400">Personal Information</h2>
+                            <h2 className="text-[10px] font-bold uppercase tracking-[0.1em] text-teal-400">Personal Information</h2>
                         </div>
                         <form onSubmit={handleUpdate} className="space-y-2.5">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2.5">
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-50">First Name</label>
+                                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-85">First Name</label>
                                     <div className="relative group">
                                         <input value={formData.first_name} onChange={e => setFormData({ ...formData, first_name: e.target.value })} className="input !py-3.5 !pl-10 !px-4 w-full focus:bg-white/5" />
                                         <User className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-20 group-focus-within:opacity-50 transition-opacity" />
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-50">Last Name</label>
+                                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-85">Last Name</label>
                                     <div className="relative group">
                                         <input value={formData.last_name} onChange={e => setFormData({ ...formData, last_name: e.target.value })} className="input !py-3.5 !pl-10 !px-4 w-full focus:bg-white/5" />
                                         <User className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-20 group-focus-within:opacity-50 transition-opacity" />
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-50">Email Address</label>
+                                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-85">Email Address</label>
                                     <div className="relative group">
                                         <input value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="input !py-3.5 !pl-10 !px-4 w-full focus:bg-white/5" />
                                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-20 group-focus-within:opacity-50 transition-opacity" />
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-50">Phone Number</label>
+                                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-85">Phone Number</label>
                                     <div className="relative group">
                                         <input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="input !py-3.5 !pl-10 !px-4 w-full focus:bg-white/5" placeholder="+91 XXXX XXX XXX" />
                                         <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-20 group-focus-within:opacity-50 transition-opacity" />
@@ -148,7 +148,7 @@ const SettingsPage = ({ user, onUpdate }) => {
                                 </div>
                             </div>
                             <div className="space-y-1.5 pb-2">
-                                <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-50">Physical Address</label>
+                                <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-85">Physical Address</label>
                                 <div className="relative group">
                                     <input value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} className="input !py-3.5 !pl-10 !px-4 w-full focus:bg-white/5" placeholder="Enter full residence/facility address" />
                                     <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-20 group-focus-within:opacity-50 transition-opacity" />
@@ -171,11 +171,11 @@ const SettingsPage = ({ user, onUpdate }) => {
 
                             {/* Account Security Section */}
                             <div className="pt-4 border-t border-white/5 space-y-4">
-                                <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-blue-400">Account Security</h3>
+                                <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-400">Account Security</h3>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2.5">
                                     <div className="space-y-1 md:col-span-2">
-                                        <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-50">Username</label>
+                                        <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-85">Username</label>
                                         <div className="relative group">
                                             <input value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} className="input !py-3.5 !pl-10 !px-4 w-full focus:bg-white/5" placeholder="Enter your username" />
                                             <User className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-20 group-focus-within:opacity-50 transition-opacity" />
@@ -183,7 +183,7 @@ const SettingsPage = ({ user, onUpdate }) => {
                                     </div>
 
                                     <div className="space-y-1.5">
-                                        <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-50">New Password</label>
+                                        <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-85">New Password</label>
                                         <div className="relative group">
                                             <input 
                                                 type="password"
@@ -197,7 +197,7 @@ const SettingsPage = ({ user, onUpdate }) => {
                                     </div>
 
                                     <div className="space-y-1.5">
-                                        <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-50">Confirm Password</label>
+                                        <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 px-1 opacity-85">Confirm Password</label>
                                         <div className="relative group">
                                             <input 
                                                 type="password"

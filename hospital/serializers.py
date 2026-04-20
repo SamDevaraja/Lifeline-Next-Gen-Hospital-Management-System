@@ -231,6 +231,7 @@ class MedicalRecordSerializer(serializers.ModelSerializer):
 
 class BillSerializer(serializers.ModelSerializer):
     patient_name = serializers.SerializerMethodField()
+    service_type = serializers.SerializerMethodField()
 
     class Meta:
         model = Bill
@@ -238,6 +239,12 @@ class BillSerializer(serializers.ModelSerializer):
 
     def get_patient_name(self, obj):
         return obj.patient.get_name if obj.patient else None
+
+    def get_service_type(self, obj):
+        if obj.medicine_cost > 0: return 'Pharmacy'
+        if obj.test_cost > 0: return 'Laboratory'
+        if obj.consultation_fee > 0: return 'Consultation'
+        return 'General'
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -267,13 +274,16 @@ class TeleConsultationSessionSerializer(serializers.ModelSerializer):
     created_by_id = serializers.ReadOnlyField(source='created_by.id')
     participants = MeetingParticipantSerializer(many=True, read_only=True)
     doctor_permanent_link = serializers.ReadOnlyField(source='created_by.permanent_meet_link')
+    appointment_date = serializers.ReadOnlyField(source='appointment.appointment_date')
+    appointment_time = serializers.ReadOnlyField(source='appointment.appointment_time')
 
     class Meta:
         model = TeleConsultationSession
         fields = [
             'id', 'appointment', 'patient', 'patient_name', 
             'created_by', 'created_by_name', 'created_by_id', 'doctor_permanent_link',
-            'token', 'meeting_link', 'status', 'participants', 'created_at'
+            'token', 'meeting_link', 'status', 'participants', 'created_at',
+            'appointment_date', 'appointment_time'
         ]
 
 

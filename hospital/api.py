@@ -660,10 +660,19 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         if not doctor_id or not app_date:
             return Response({'error': 'Clinical context (Doctor/Date) required.'}, status=400)
             
+        try:
+            doctor_id = int(doctor_id)
+        except:
+            return Response({'error': 'Institutional format error: Invalid Doctor ID.'}, status=400)
+            
         day_appts = Appointment.objects.filter(
-            doctor_id=doctor_id,
+            Q(doctor_id=doctor_id) | Q(doctorId=doctor_id),
             appointment_date=app_date,
-            status__in=['pending', 'confirmed', 'arrived', 'in-consultation']
+            status__icontains='pending' # Robust status matching
+        ) | Appointment.objects.filter(
+            Q(doctor_id=doctor_id) | Q(doctorId=doctor_id),
+            appointment_date=app_date,
+            status__in=['confirmed', 'arrived', 'in-consultation']
         )
         
         # Institutional Slot Map: 08:00 - 20:00 in 30-minute intervals
@@ -678,10 +687,12 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             if not a.appointment_time: continue
             try:
                 # a.appointment_time is a datetime.time object
-                a_mins = a.appointment_time.hour * 60 + a.appointment_time.minute
+                a_total_mins = a.appointment_time.hour * 60 + a.appointment_time.minute
                 # Clinical Interval Quantization (Floor to nearest 30)
-                floor_m = (a_mins // 30) * 30
-                key = f"{a.appointment_time.hour:02d}:{floor_m:02d}"
+                floor_total_mins = (a_total_mins // 30) * 30
+                floor_h = floor_total_mins // 60
+                floor_m = floor_total_mins % 60
+                key = f"{floor_h:02d}:{floor_m:02d}"
                 if key in slots:
                     slots[key] += 1
             except Exception as e:
@@ -697,8 +708,27 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         doctor_id = request.data.get('doctor')
+        patient_id = request.data.get('patient')
         app_date = request.data.get('appointment_date')
         app_time = request.data.get('appointment_time')
+
+        if not patient_id and hasattr(request.user, 'patient'):
+            patient_id = request.user.patient.id
+
+        if patient_id and app_date:
+            # ─── Patient Daily Limit Enforcer ───────────────────
+            # A patient is restricted to exactly one clinical encounter per day
+            existing_daily = Appointment.objects.filter(
+                patient_id=patient_id,
+                appointment_date=app_date,
+                status__in=['pending', 'confirmed', 'arrived', 'in-consultation']
+            ).exclude(status='cancelled').exists()
+            
+            if existing_daily:
+                return Response(
+                    {'error': f'An appointment is already scheduled for {app_date}. Only one clinical encounter per patient is permitted per day.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         if doctor_id and app_date and app_time:
             from datetime import datetime
@@ -738,9 +768,17 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 
-                # Zero-Tolerance Exact Overlap Check (Legacy Safety)
-                if day_appts.filter(appointment_time=app_time).exists():
-                    return Response({'error': f'Dr. Slot Conflict: An appointment is already finalized at exactly {app_time}.'}, status=status.HTTP_400_BAD_REQUEST)
+                # ─── Clinical Sub-Slot Partitioning ─────────────────
+                # Assign 10-minute intervals within the 30-minute block (e.g., 00m, 10m, 20m)
+                adjusted_mins = interval_start_min + (conflict_count * 10)
+                adj_h, adj_m = divmod(adjusted_mins, 60)
+                request.data['appointment_time'] = f"{adj_h:02d}:{adj_m:02d}"
+
+                # ─── Institutional Bridge Automation ─────────────────
+                # Automatically link the specialist's permanent bridge if not explicitly provided
+                doctor = Doctor.objects.filter(id=doctor_id).first()
+                if doctor and doctor.permanent_meet_link and not request.data.get('meeting_link'):
+                    request.data['meeting_link'] = doctor.permanent_meet_link
 
             except Exception as e:
                 print(f"Capacity check bypassed: {e}")
@@ -772,12 +810,135 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
             qs = qs.filter(patient_id=patient_id)
         return qs
 
+    @action(detail=True, methods=['get'])
+    def generate_pdf(self, request, pk=None):
+        """Generate a professional Clinical Assessment / Diagnostic Summary PDF."""
+        import io
+        from django.http import HttpResponse # type: ignore
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle # type: ignore
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle # type: ignore
+        from reportlab.lib import colors # type: ignore
+        from reportlab.lib.pagesizes import A4 # type: ignore
+        
+        record = self.get_object()
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=50, bottomMargin=50)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Custom Styles (LUNA Aesthetic)
+        title_style = ParagraphStyle(
+            'LUNATitle', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#0F4C81'),
+            spaceAfter=5, fontName='Helvetica-Bold'
+        )
+        subtitle_style = ParagraphStyle(
+            'LUNASub', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#2EC4B6'),
+            spaceAfter=20, fontName='Helvetica-Bold', leading=12
+        )
+        norm_style = ParagraphStyle('LUNANorm', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#061e3a'), leading=14)
+        footer_style = ParagraphStyle('LUNAFooter', parent=styles['Normal'], fontSize=8, textColor=colors.gray, alignment=1)
+
+        # Header Section
+        elements.append(Paragraph("Lifeline Hospital", title_style))
+        elements.append(Paragraph("CLINICAL ASSESSMENT SUMMARY", subtitle_style))
+        elements.append(Paragraph("Lifeline Medical Tower, Koramangala<br/>Bangalore — 560034<br/>Phone: +91 80 4567 8900", norm_style))
+        elements.append(Spacer(1, 20))
+
+        # ID & Clinical Context
+        info_data = [
+            [
+                Paragraph(f"<b>Patient:</b> {str(record.patient.get_name)}<br/>Age: {record.patient.age or 'N/A'}<br/>ID: PID-{record.patient.id:04d}", norm_style),
+                Paragraph(f"<b>Attending:</b> Dr. {str(record.doctor.get_name if record.doctor else 'Clinical Staff')}<br/>Date of Visit: {record.visit_date}<br/>Ref: ARCH-{record.id:04d}", norm_style)
+            ]
+        ]
+        info_table = Table(info_data, colWidths=[250, 250])
+        info_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP')]))
+        elements.append(info_table)
+        elements.append(Spacer(1, 25))
+
+        # Diagnostic Summary
+        elements.append(Paragraph("<b>Clinical Diagnosis:</b>", styles['Heading3']))
+        elements.append(Paragraph(str(record.diagnosis), norm_style))
+        elements.append(Spacer(1, 15))
+
+        # Clinical Notes / Treatment Plan
+        if record.prescription:
+            elements.append(Paragraph("<b>Treatment Protocol & Directives:</b>", styles['Heading4']))
+            elements.append(Paragraph(str(record.prescription), norm_style))
+            elements.append(Spacer(1, 15))
+
+        # Physical Parameters (Vital Grid)
+        elements.append(Paragraph("<b>Physical Parameters:</b>", styles['Heading4']))
+        elements.append(Spacer(1, 5))
+        v = record.vitals or {}
+        vital_data = [
+            [
+                Paragraph(f"<b>BP:</b> {v.get('blood_pressure', v.get('bp', 'N/A'))}", norm_style),
+                Paragraph(f"<b>Pulse:</b> {v.get('pulse', v.get('pulse_rate', 'N/A'))}", norm_style),
+                Paragraph(f"<b>Temp:</b> {v.get('temperature', v.get('temp', 'N/A'))}", norm_style)
+            ]
+        ]
+        vital_table = Table(vital_data, colWidths=[166, 166, 166])
+        vital_table.setStyle(TableStyle([
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
+            ('TOPPADDING', (0,0), (-1,-1), 8),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ]))
+        elements.append(vital_table)
+        elements.append(Spacer(1, 30))
+
+        # Secure Footer
+        elements.append(Spacer(1, 50))
+        elements.append(Paragraph("This document serves as an authoritative clinical record produced by the Lifeline HMS Unified Data Terminal.", footer_style))
+        elements.append(Paragraph("Electronic Verification Active.", footer_style))
+
+        doc.build(elements)
+        pdf = buffer.getvalue()
+        buffer.close()
+        
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="Record_{record.id:04d}.pdf"'
+        return response
+
     def perform_create(self, serializer):
         user = self.request.user
-        if hasattr(user, 'doctor'):
-            serializer.save(doctor=user.doctor, updated_by=user)
-        else:
-            serializer.save(updated_by=user)
+        doctor = getattr(user, 'doctor', None)
+        instance = serializer.save(doctor=doctor, updated_by=user)
+        
+        # ─── Clinical Notification Release ───────────────────
+        # Automatically bridge the diagnostic summary to the patient's terminal
+        if instance.patient and instance.patient.user:
+            from hospital.models import Notification, Appointment
+            
+            # 1. Archive Dispatch Notification
+            Notification.objects.create(
+                user=instance.patient.user,
+                title="Clinical Record Released",
+                message=f"Dr. {instance.doctor.get_name if instance.doctor else 'Physician'} has finalized your diagnostic summary and prescription protocol. You may access the digital transcript in your records portal.",
+                notification_type="system"
+            )
+            
+            # 2. Automated Continuity (Follow-up Scheduling)
+            follow_up = self.request.data.get('follow_up_date')
+            if follow_up:
+                try:
+                    Appointment.objects.create(
+                        patient=instance.patient,
+                        doctor=instance.doctor,
+                        appointment_date=follow_up,
+                        appointment_time="09:00", # Default morning entry for follow-up
+                        status='pending',
+                        symptoms=f"Follow-up visit for record: {instance.diagnosis[:50]}..."
+                    )
+                    Notification.objects.create(
+                        user=instance.patient.user,
+                        title="Follow-up Appointment Provisioned",
+                        message=f"A continuity consultation has been scheduled for {follow_up}. Please verify the terminal time with the registrar.",
+                        notification_type="appointment"
+                    )
+                except Exception as e:
+                    print(f"Follow-up automation failed: {e}")
 
 
 
@@ -950,6 +1111,11 @@ class NotificationViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset()[:50]
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def count(self, request):
+        count = self.get_queryset().filter(is_read=False).count()
+        return Response({'count': count})
 
     @action(detail=False, methods=['post'])
     def mark_all_read(self, request):
@@ -1174,6 +1340,97 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         if date:
             qs = qs.filter(created_at__date=date)
         return qs
+
+    @action(detail=True, methods=['get'])
+    def generate_pdf(self, request, pk=None):
+        """Generate a professional Clinical Prescription PDF with institutional branding."""
+        import io
+        from django.http import HttpResponse # type: ignore
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle # type: ignore
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle # type: ignore
+        from reportlab.lib import colors # type: ignore
+        from reportlab.lib.pagesizes import A4 # type: ignore
+        
+        prescription = self.get_object()
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=50, bottomMargin=50)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Custom Styles (LUNA Aesthetic)
+        title_style = ParagraphStyle(
+            'LUNATitle', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#0F4C81'),
+            spaceAfter=5, fontName='Helvetica-Bold'
+        )
+        subtitle_style = ParagraphStyle(
+            'LUNASub', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#2EC4B6'),
+            spaceAfter=20, fontName='Helvetica-Bold'
+        )
+        norm_style = ParagraphStyle('LUNANorm', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#061e3a'))
+        footer_style = ParagraphStyle('LUNAFooter', parent=styles['Normal'], fontSize=8, textColor=colors.gray, alignment=1)
+
+        # Header Section
+        elements.append(Paragraph("Lifeline Hospital", title_style))
+        elements.append(Paragraph("DIGITAL PRESCRIPTION RECEPTACLE", subtitle_style))
+        elements.append(Paragraph("Lifeline Medical Tower, Koramangala<br/>Bangalore — 560034<br/>Phone: +91 80 4567 8900", norm_style))
+        elements.append(Spacer(1, 20))
+
+        # ID & Clinical Context
+        info_data = [
+            [
+                Paragraph(f"<b>Patient:</b> {str(prescription.patient.get_name)}<br/>ID: PID-{prescription.patient.id:04d}", norm_style),
+                Paragraph(f"<b>Specialist:</b> Dr. {str(prescription.doctor.get_name)}<br/>Date: {prescription.created_at.strftime('%Y-%m-%d')}<br/>HASH: {prescription.qr_code_id}", norm_style)
+            ]
+        ]
+        info_table = Table(info_data, colWidths=[250, 250])
+        elements.append(info_table)
+        elements.append(Spacer(1, 20))
+
+        # Prescription Protocol
+        elements.append(Paragraph("<b>Medication Protocol:</b>", styles['Heading3']))
+        elements.append(Spacer(1, 10))
+
+        med_data = [['Medicine', 'Dosage', 'Frequency', 'Duration']]
+        for med in prescription.medicines:
+             med_data.append([
+                str(med.get('name', med.get('medication_name', 'N/A'))),
+                str(med.get('dosage', med.get('dose', 'N/A'))),
+                str(med.get('frequency', 'N/A')),
+                str(med.get('duration', med.get('duration_days', 'N/A')))
+            ])
+
+        med_table = Table(med_data, colWidths=[200, 100, 100, 100])
+        med_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0F4C81')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,0), 10),
+            ('BOTTOMPADDING', (0,0), (-1,0), 12),
+            ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#F8FAFC')),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ]))
+        elements.append(med_table)
+        elements.append(Spacer(1, 20))
+
+        if prescription.notes:
+            elements.append(Paragraph("<b>Clinical Instructions:</b>", styles['Heading4']))
+            elements.append(Paragraph(str(prescription.notes), norm_style))
+            elements.append(Spacer(1, 30))
+
+        # Secure Footer
+        elements.append(Spacer(1, 60))
+        elements.append(Paragraph("This is an electronically generated transcript. No physical signature required for dispensary purposes.", footer_style))
+        elements.append(Paragraph(f"VERIFICATION HASH: {prescription.qr_code_id}", footer_style))
+
+        doc.build(elements)
+        pdf = buffer.getvalue()
+        buffer.close()
+        
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="RX_{prescription.qr_code_id}.pdf"'
+        return response
 
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter # type: ignore
 from dj_rest_auth.registration.views import SocialLoginView # type: ignore
