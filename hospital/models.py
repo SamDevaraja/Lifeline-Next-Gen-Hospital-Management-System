@@ -1,4 +1,5 @@
 from django.db import models  # type: ignore
+from django.db.models import Q
 from django.contrib.auth.models import User  # type: ignore
 from django.utils import timezone  # type: ignore
 import uuid
@@ -8,7 +9,7 @@ import uuid
 class UserProfile(models.Model):
     ROLE_CHOICES = [
         ('admin', 'Admin'), ('doctor', 'Doctor'), ('patient', 'Patient'),
-        ('receptionist', 'Receptionist'), ('pharmacist', 'Pharmacist'),
+        ('receptionist', 'Receptionist'),
     ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='patient')
@@ -206,6 +207,9 @@ class Bill(models.Model):
         indexes = [models.Index(fields=['status']), models.Index(fields=['bill_date'])]
 
     def save(self, *args, **kwargs):
+        import uuid
+        if not self.invoice_number:
+            self.invoice_number = f"INV-LUNA-{uuid.uuid4().hex[:6].upper()}"
         from decimal import Decimal
         f = lambda v: Decimal(str(v or 0))
         subtotal = (f(self.consultation_fee) + f(self.medicine_cost) + f(self.test_cost) + f(self.room_charge) + f(self.other_charges))
@@ -318,7 +322,7 @@ class Prescription(models.Model):
 
 class PharmacyOrder(models.Model):
     prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE, related_name='pharmacy_orders')
-    pharmacist = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='dispensed_orders')
+    assigned_staff = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='dispensed_orders')
     status = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('completed', 'Completed'), ('cancelled', 'Cancelled')], default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -372,13 +376,23 @@ def notify_lab_ready(sender, instance, created, **kwargs):
 @receiver(post_save, sender=PharmacyItem)
 def notify_pharmacy_stock(sender, instance, created, **kwargs):
     if instance.stock_level <= 20:
-        for admin in User.objects.filter(is_superuser=True):
-            Notification.objects.create(user=admin, title="Critical Pharmacy Asset Shortage", message=f"Inventory '{instance.name}' has dropped below critical levels.", notification_type="system")
+        # Notify superusers for immediate replenishment
+        targeted_users = User.objects.filter(is_superuser=True).distinct()
+        for u in targeted_users:
+            Notification.objects.create(
+                user=u, 
+                title="🚨 Critical Asset Threshold Breach", 
+                message=f"Institutional Inventory '{instance.name}' has dropped below the safety limit ({instance.stock_level} remaining). Immediate fulfillment required.", 
+                notification_type="system"
+            )
 
 @receiver(post_save, sender=Prescription)
 def notify_prescription(sender, instance, created, **kwargs):
-    if created and instance.patient and getattr(instance.patient, 'user', None):
-        Notification.objects.create(user=instance.patient.user, title="New Clinical Prescription", message=f"Dr. {instance.doctor.get_name} has authorized a new medicinal prescription.", notification_type="system")
+    if created:
+        if instance.patient and getattr(instance.patient, 'user', None):
+            Notification.objects.create(user=instance.patient.user, title="New Clinical Prescription", message=f"Dr. {instance.doctor.get_name} has authorized a new medicinal prescription.", notification_type="system")
+        
+
 
 @receiver(post_save, sender=User)
 def initialize_user_profile(sender, instance, created, **kwargs):

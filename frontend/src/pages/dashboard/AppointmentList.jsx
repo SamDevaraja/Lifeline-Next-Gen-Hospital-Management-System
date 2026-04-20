@@ -31,6 +31,13 @@ const AppointmentList = ({ user }) => {
     const [detailsModal, setDetailsModal] = useState({ open: false, item: null });
     const [availableSlots, setAvailableSlots] = useState({});
 
+    const [allPatients, setAllPatients] = useState([]);
+    
+    const role = (user?.role || '').toLowerCase();
+    const isAdmin = role === 'admin' || user?.is_superuser;
+    const isDoctor = role === 'doctor';
+    const isReceptionist = role === 'receptionist';
+
     const fetchAppointments = async () => {
         setLoading(true);
         try {
@@ -41,17 +48,25 @@ const AppointmentList = ({ user }) => {
             if (query) apptUrl += `?${query}`;
 
             const promises = [api.get(apptUrl)];
-            if (user?.role === 'patient' || user?.role === 'receptionist' || user?.role === 'admin') {
+            if (isReceptionist || isAdmin) {
                 promises.push(api.get('doctors/available/'));
-            } else if (user?.role === 'doctor') {
                 promises.push(api.get('patients/'));
+            } else if (isDoctor) {
+                promises.push(api.get('patients/'));
+            } else if (role === 'patient') {
+                promises.push(api.get('doctors/available/'));
             }
 
             const results = await Promise.all(promises);
             setAllAppointments(results[0].data);
-            if (results[1]) {
-                if (user?.role === 'doctor') setMyPatients(results[1].data);
-                else setDoctors(results[1].data);
+            
+            if (isReceptionist || isAdmin) {
+                setDoctors(results[1].data);
+                setAllPatients(results[2].data);
+            } else if (isDoctor) {
+                setMyPatients(results[1].data);
+            } else if (role === 'patient') {
+                setDoctors(results[1].data);
             }
 
         } catch (err) {
@@ -292,7 +307,14 @@ const AppointmentList = ({ user }) => {
                 title="Schedule New Appointment"
                 onFieldChange={handleModalFieldChange}
                 fields={[
-                    user?.role === 'doctor' ? {
+                    (user?.role === 'receptionist' || isAdmin) && {
+                        key: 'patient',
+                        label: 'Target Patient',
+                        type: 'select',
+                        options: allPatients.map(p => ({ value: p.id, label: p.get_name || `${p.user?.first_name || ''} ${p.user?.last_name || ''}`.trim() })),
+                        fullWidth: true
+                    },
+                    (isDoctor) ? {
                         key: 'patient',
                         label: 'Select Patient',
                         type: 'select',
@@ -315,11 +337,11 @@ const AppointmentList = ({ user }) => {
                         fullWidth: true
                     },
                     { key: 'description', label: 'Clinical Indication / Symptoms', placeholder: 'Brief description of chief complaint...', fullWidth: true }
-                ]}
+                ].filter(Boolean)}
                 onConfirm={(vals) => {
                     const { date, time, doctor, patient, description } = vals;
-                    const finalPatient = user?.role === 'doctor' ? patient : (user.patient_id || user.id);
-                    const finalDoctor = user?.role === 'doctor' ? (user.doctor_id || user.id) : doctor;
+                    const finalPatient = (isReceptionist || isAdmin || isDoctor) ? patient : (user.patient_id || user.id);
+                    const finalDoctor = isDoctor ? (user.doctor_id || user.id) : doctor;
 
                     if (!date || !time || !finalPatient || !finalDoctor) {
                         toast.error("Missing critical scheduling parameters.");
@@ -355,31 +377,38 @@ const AppointmentList = ({ user }) => {
                 ))}
             </div>
 
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Patient Appointments</h1>
-                    <button onClick={fetchAppointments} className={`p-1 opacity-40 hover:opacity-100 transition-all ${loading ? 'animate-spin' : ''}`}>
-                             <RefreshCw className="w-3.5 h-3.5" />
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center border shadow-sm transition-transform hover:scale-105" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                        <Calendar className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Service Schedule</h1>
+                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mt-0.5" style={{ color: 'var(--luna-text-muted)' }}>Clinical Engagement Registry • Institutional Index</p>
+                    </div>
+                    <button onClick={fetchAppointments} className={`p-1.5 opacity-20 hover:opacity-100 transition-all ml-2 ${loading ? 'animate-spin' : ''}`}>
+                             <RefreshCw className="w-4 h-4" />
                     </button>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative group w-full md:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 opacity-30" />
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                    <div className="relative group w-full lg:w-64">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 opacity-60 group-focus-within:opacity-100 transition-all text-blue-500" />
                         <input
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             type="text"
                             placeholder="Scan schedule..."
-                            className="w-full pl-9 pr-3 py-2 text-xs border rounded-lg outline-none transition-all font-bold tracking-tight bg-[var(--luna-card)]"
+                            className="w-full pl-11 pr-4 py-2.5 text-[10px] border rounded-xl outline-none transition-all font-bold tracking-tight bg-[var(--luna-card)] hover:border-blue-500/30 focus:border-blue-500/50 shadow-sm"
                             style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}
                         />
                     </div>
 
-                    <div className="relative">
+                    <div className="relative w-full sm:min-w-[130px] sm:w-auto">
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="w-full pl-3 pr-8 py-2 text-xs border rounded-lg appearance-none cursor-pointer focus:outline-none bg-[var(--luna-card)]"
+                            className="w-full pl-4 pr-10 py-2.5 text-[10px] border rounded-xl appearance-none cursor-pointer focus:outline-none bg-[var(--luna-card)] font-bold tracking-tight shadow-sm hover:border-blue-500/30"
                             style={{ color: theme === 'dark' ? 'white' : 'var(--luna-blue)', borderColor: 'var(--luna-border)' }}
                         >
                             {['all', 'pending', 'confirmed', 'arrived', 'in-consultation', 'completed', 'cancelled'].map(f => (
@@ -388,14 +417,16 @@ const AppointmentList = ({ user }) => {
                                 </option>
                             ))}
                         </select>
-                        <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 opacity-30 pointer-events-none" />
+                        <Filter className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-30 pointer-events-none" />
                     </div>
 
-                    {(user?.role === 'patient' || user?.role === 'doctor') && (
+                    {(user?.role === 'patient' || user?.role === 'doctor' || user?.role === 'receptionist' || user?.role === 'admin') && (
                         <button
                             onClick={() => setNewApptModal({ open: true })}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-hover transition-colors shadow-sm">
-                            <Plus className="w-3.5 h-3.5" /> Initialize Protocol
+                            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[var(--luna-blue)] to-[#1e4ed8] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.1em] hover:brightness-110 active:scale-95 transition-all shadow-md shadow-blue-500/20 whitespace-nowrap"
+                        >
+                            <Calendar className="w-3.5 h-3.5" />
+                            Schedule Consult
                         </button>
                     )}
                 </div>

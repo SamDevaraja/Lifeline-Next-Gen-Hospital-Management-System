@@ -46,9 +46,7 @@ class RBACPermission(permissions.BasePermission):
             allowed_views = ['PatientViewSet', 'AppointmentViewSet', 'BillViewSet', 'DoctorViewSet']
             return view_name in allowed_views
             
-        if role == 'pharmacist':
-            allowed_views = ['PrescriptionViewSet', 'PharmacyItemViewSet', 'PharmacyOrderViewSet', 'LabTestViewSet', 'PatientViewSet']
-            return view_name in allowed_views
+
             
         # Default block if not mapped
         return False

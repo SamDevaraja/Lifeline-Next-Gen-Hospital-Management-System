@@ -21,6 +21,24 @@ const BillingPage = ({ user }) => {
     // UI Modal State
     const [detailsModal, setDetailsModal] = useState({ open: false, item: null });
     const [invoiceModal, setInvoiceModal] = useState({ open: false });
+    const [patients, setPatients] = useState([]);
+    const [doctors, setDoctors] = useState([]);
+    const [appointments, setAppointments] = useState([]);
+
+    const fetchRegistryData = async () => {
+        try {
+            const [pRes, dRes, aRes] = await Promise.all([
+                api.get('patients/'),
+                api.get('doctors/'),
+                api.get('appointments/')
+            ]);
+            setPatients(pRes.data?.results || pRes.data || []);
+            setDoctors(dRes.data?.results || dRes.data || []);
+            setAppointments(aRes.data?.results || aRes.data || []);
+        } catch (e) {
+            console.error("Institutional registry sync failed:", e);
+        }
+    };
 
     const fetchBills = async () => {
         setLoading(true);
@@ -39,6 +57,9 @@ const BillingPage = ({ user }) => {
 
     useEffect(() => {
         fetchBills();
+        if (user?.role === 'admin' || user?.role === 'receptionist') {
+            fetchRegistryData();
+        }
     }, [user]);
 
     const filtered = useMemo(() => {
@@ -53,9 +74,9 @@ const BillingPage = ({ user }) => {
     const stats = useMemo(() => {
         const sb = bills || [];
         return {
-            revenue: sb.reduce((a, b) => a + parseFloat(b.total_amount || 0), 0),
-            pending: sb.filter(b => b.status === 'pending').reduce((a, b) => a + parseFloat(b.total_amount || 0), 0),
-            paidToday: sb.filter(b => b.status === 'paid' && b.bill_date === new Date().toISOString().split('T')[0]).reduce((a, b) => a + parseFloat(b.total_amount || 0), 0),
+            revenue: sb.reduce((a, b) => a + (parseFloat(b?.total_amount) || 0), 0),
+            pending: sb.filter(b => b?.status === 'pending').reduce((a, b) => a + (parseFloat(b?.total_amount) || 0), 0),
+            paidToday: sb.filter(b => b?.status === 'paid' && b?.bill_date === new Date().toISOString().split('T')[0]).reduce((a, b) => a + (parseFloat(b?.total_amount) || 0), 0),
             count: sb.length
         };
     }, [bills]);
@@ -112,19 +133,76 @@ const BillingPage = ({ user }) => {
 
             <InputModal 
                 isOpen={invoiceModal.open}
-                title="Generate New Clinical Invoice"
+                title="Institutional Billing Provisioning"
                 fields={[
-                    { key: 'patient_id', label: 'Patient MRN/ID', type: 'text', fullWidth: true },
-                    { key: 'total_amount', label: 'Grand Total (₹)', type: 'number' },
-                    { key: 'bill_date', label: 'Billing Date', type: 'date', initialValue: new Date().toISOString().split('T')[0] },
+                    { 
+                        key: 'patient', 
+                        label: 'Patient Registry', 
+                        type: 'select', 
+                        fullWidth: true,
+                        options: patients.map(p => ({ label: `${p.get_name} (PID-${p.id})`, value: p.id }))
+                    },
+                    { 
+                        key: 'doctor', 
+                        label: 'Attending Physician', 
+                        type: 'select', 
+                        options: doctors.map(d => ({ label: `Dr. ${d.get_name}`, value: d.id }))
+                    },
+                    { 
+                        key: 'appointment', 
+                        label: 'Clinical Appointment', 
+                        type: 'select',
+                        options: appointments.map(a => ({ label: `${a.appointment_date} - ${a.description.substring(0, 20)}...`, value: a.id }))
+                    },
+                    { key: 'consultation_fee', label: 'Consultation Fee (₹)', type: 'number', initialValue: 500 },
+                    { key: 'medicine_cost', label: 'Medicinal Subtotal (₹)', type: 'number', initialValue: 0 },
+                    { key: 'test_cost', label: 'Diagnostic/Lab Cost (₹)', type: 'number', initialValue: 0 },
+                    { key: 'room_charge', label: 'Facility/Room Charge (₹)', type: 'number', initialValue: 0 },
+                    { key: 'other_charges', label: 'Administrative Fees (₹)', type: 'number', initialValue: 0 },
+                    { key: 'discount', label: 'Institutional Discount (%)', type: 'number', initialValue: 0 },
+                    { key: 'notes', label: 'Clinical Billing Notes', type: 'text', fullWidth: true, placeholder: 'Specify institutional adjustments or insurance details...' },
                 ]}
+                onFieldChange={(key, val, currentValues) => {
+                    if (key === 'patient') {
+                        const patId = Number(val);
+                        // Institutional Chronos-Sort: Identification of the most recent clinical session
+                        const recent = [...appointments]
+                            .filter(a => Number(a.patient) === patId)
+                            .sort((a, b) => {
+                                const dT_A = new Date(`${a.appointment_date}T${a.appointment_time || '00:00'}`);
+                                const dT_B = new Date(`${b.appointment_date}T${b.appointment_time || '00:00'}`);
+                                return dT_B - dT_A; // Precise descending chronological order
+                            })[0];
+                        
+                        if (recent) {
+                            currentValues.appointment = recent.id;
+                            currentValues.doctor = recent.doctor;
+                            // Pre-fill notes with appointment telemetry for realism
+                            currentValues.notes = `Invoice for clinical session on ${recent.appointment_date} at ${recent.appointment_time || 'N/A'}.`;
+                            // Synchronize physician's specific consultation fee
+                            const doc = doctors.find(d => Number(d.id) === Number(recent.doctor));
+                            if (doc) {
+                                currentValues.consultation_fee = doc.consultation_fee || 500;
+                            }
+                        }
+                    }
+                    if (key === 'doctor') {
+                        const doc = doctors.find(d => Number(d.id) === Number(val));
+                        if (doc) {
+                            currentValues.consultation_fee = doc.consultation_fee || 500;
+                        }
+                    }
+                }}
                 onConfirm={async (vals) => {
                     try {
+                        toast.loading('Committing invoice to ledger...', { id: 'bill-post' });
                         await api.post('bills/', vals);
-                        toast.success("Invoice generated.");
+                        toast.success("Clinical invoice finalized and dispatched.", { id: 'bill-post' });
                         setInvoiceModal({ open: false });
                         fetchBills();
-                    } catch (e) { toast.error("Billing failure."); }
+                    } catch (e) { 
+                        toast.error("Institutional billing failure. Verify registry links.", { id: 'bill-post' }); 
+                    }
                 }}
                 onCancel={() => setInvoiceModal({ open: false })}
             />
@@ -170,11 +248,11 @@ const BillingPage = ({ user }) => {
                         <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 opacity-30 pointer-events-none" />
                     </div>
 
-                    {user?.role === 'admin' && (
+                    {(user?.role === 'admin' || user?.role === 'receptionist') && (
                         <button
                             onClick={() => setInvoiceModal({ open: true })}
                             className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-hover transition-colors shadow-sm">
-                            <Plus className="w-3.5 h-3.5" /> New Invoice
+                            <Plus className="w-3.5 h-3.5" /> Generate Bill
                         </button>
                     )}
                 </div>
@@ -248,7 +326,7 @@ const BillingPage = ({ user }) => {
                                         <p className="font-medium text-[13px]" style={{ color: 'var(--luna-text-main)' }}>{b.patient_name || 'Emergency Guest'}</p>
                                     </td>
                                     <td className="px-4 py-3 md:py-4">
-                                        <p className="font-semibold text-[14px] tracking-tight whitespace-nowrap" style={{ color: 'var(--luna-text-main)' }}>₹{parseFloat(b.total_amount).toLocaleString()}</p>
+                                        <p className="font-semibold text-[14px] tracking-tight whitespace-nowrap" style={{ color: 'var(--luna-text-main)' }}>₹{(parseFloat(b?.total_amount) || 0).toLocaleString()}</p>
                                     </td>
 
                                     <td className="px-4 py-4 hidden sm:table-cell">
@@ -264,7 +342,7 @@ const BillingPage = ({ user }) => {
 
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-1.5">
-                                            {b.status === 'pending' && user?.role === 'admin' && (
+                                            {b.status === 'pending' && (user?.role === 'admin' || user?.role === 'receptionist') && (
                                                 <button onClick={() => handleMarkPaid(b.id, b.invoice_number)} 
                                                     title="Mark as Paid"
                                                     className="p-1.5 rounded-lg border bg-[var(--luna-card)] border-amber-500/30 text-amber-500 hover:bg-amber-500/10 transition-all hover:-translate-y-0.5 shadow-sm">

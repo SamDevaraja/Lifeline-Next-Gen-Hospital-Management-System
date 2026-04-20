@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 import {
     Activity, Search, Plus, Stethoscope, BrainCircuit,
     Clock, DollarSign, QrCode, User, Mail, Smartphone,
-    Lock, HeartPulse, Droplets, CalendarDays, Filter,
-    FileText, Phone, MapPin, Settings
+    Lock, HeartPulse, Droplets, CalendarDays, Calendar, Filter,
+    FileText, Phone, MapPin, Settings, Users
 } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
@@ -190,7 +190,9 @@ const ResourceList = ({ type, title, user }) => {
     };
     const handleModalFieldChange = async (key, val, allValues) => {
         const date = allValues.date;
-        const doctorId = user.doctor_id;
+        const doctorId = allValues.doctor || user.doctor_id;
+        const patientId = allValues.patient; // Support global selection
+        
         if (date && doctorId) {
             try {
                 const res = await api.get(`appointments/check_availability/?doctor=${doctorId}&date=${date}`);
@@ -254,6 +256,11 @@ const ResourceList = ({ type, title, user }) => {
         });
 
         return results.sort((a, b) => {
+            // Institutional Priority: Active Records -> Discharged/Specialized
+            if (a.status !== b.status) {
+                return b.status ? 1 : -1;
+            }
+            
             const nameA = (a.get_name || a.patientName || a.first_name || '').toLowerCase();
             const nameB = (b.get_name || b.patientName || b.first_name || '').toLowerCase();
             return nameA.localeCompare(nameB);
@@ -375,88 +382,54 @@ const ResourceList = ({ type, title, user }) => {
                 onConfirm={handleCreateEdit}
                 onCancel={() => setInputModal({ open: false, mode: 'create', item: null })}
             />
-            <InputModal
-                isOpen={apptModal.open}
-                title="Schedule New Clinical Encounter"
-                onFieldChange={handleModalFieldChange}
-                fields={[
-                    { key: 'patient_name', label: 'Authorized Patient', type: 'text', disabled: true, initialValue: apptModal.patient?.get_name || apptModal.patient?.user?.first_name },
-                    { key: 'date', label: 'Date of Encounter', type: 'date', initialValue: new Date().toISOString().split('T')[0] },
-                    { 
-                        key: 'time', 
-                        label: 'Time Slot (30m Interval)', 
-                        type: 'radio-grid',
-                        options: generateTimeOptions(),
-                        fullWidth: true
-                    },
-                    { key: 'description', label: 'Clinical Indication / Symptoms', placeholder: 'Brief description of chief complaint...', fullWidth: true }
-                ]}
-                onConfirm={(vals) => {
-                    const { date, time, description } = vals;
-                    const finalPatient = apptModal.patient.id;
-                    const finalDoctor = user.doctor_id;
-
-                    if (!date || !time || !finalPatient || !finalDoctor) {
-                        toast.error("Missing critical scheduling parameters.");
-                        return;
-                    }
-
-                    api.post('appointments/', { appointment_date: date, appointment_time: time, description: description || '', status: 'pending', patient: finalPatient, doctor: finalDoctor })
-                        .then(() => {
-                            toast.success("Encounter definitively scheduled.");
-                            setApptModal({ open: false, patient: null });
-                            setAvailableSlots({});
-                        })
-                        .catch((err) => {
-                            const errorMsg = err.response?.data?.error || "Scheduling conflict. Please verify clinical capacity.";
-                            toast.error(errorMsg);
-                        });
-                }}
-                onCancel={() => { setApptModal({ open: false, patient: null }); setAvailableSlots({}); }}
-            />
             
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>{title}</h1>
-                    <div className="h-4 w-[1px] opacity-10" style={{ background: 'var(--luna-text-main)' }} />
-                    <p className="text-[10px] font-black uppercase tracking-[0.15em] opacity-40" style={{ color: 'var(--luna-text-muted)' }}>
-                        {loading ? 'Decrypting records...' : `Total Registered: ${filtered.length}`}
-                    </p>
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center border shadow-sm transition-transform hover:scale-105" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                        {type === 'doctors' ? <Stethoscope className="w-6 h-6 text-blue-500" /> : <Users className="w-6 h-6 text-blue-500" />}
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>{title}</h1>
+                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mt-0.5" style={{ color: 'var(--luna-text-muted)' }}>{loading ? 'Decrypting records...' : `Total Registered: ${filtered.length}`} • Institutional Registry</p>
+                    </div>
                 </div>
-                <div className={`grid grid-cols-1 ${canCreate ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2 w-full md:w-auto`}>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-30" />
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto">
+                    <div className="relative group w-full lg:w-64">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 opacity-60 group-focus-within:opacity-100 transition-all text-blue-500" />
                         <input
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             type="text"
                             placeholder={`Scan ${type}...`}
-                            className="w-full pl-9 pr-3 py-2 text-xs border rounded-lg outline-none transition-all font-bold tracking-tight bg-[var(--luna-card)]"
+                            className="w-full pl-11 pr-4 py-2.5 text-[10px] border rounded-xl outline-none transition-all font-bold tracking-tight bg-[var(--luna-card)] hover:border-blue-500/30 focus:border-blue-500/50 shadow-sm"
                             style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }}
                         />
                     </div>
 
-                    <div className="relative">
+                    <div className="relative w-full sm:min-w-[130px] sm:w-auto">
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="w-full pl-3 pr-8 py-2 text-xs border rounded-lg appearance-none cursor-pointer focus:outline-none bg-[var(--luna-card)]"
+                            className="w-full pl-4 pr-10 py-2.5 text-[10px] border rounded-xl appearance-none cursor-pointer focus:outline-none bg-[var(--luna-card)] font-bold tracking-tight shadow-sm hover:border-blue-500/30"
                             style={{ color: theme === 'dark' ? 'white' : 'var(--luna-blue)', borderColor: 'var(--luna-border)' }}
                         >
                             {filterOptions.map(f => (
                                 <option key={f} value={f} style={{ background: 'var(--luna-card)', color: 'var(--luna-text-main)' }}>
-                                    {f === 'all' ? (type === 'doctors' ? `All Depts` : `All Risks`) : f}
+                                    {f === 'all' ? (type === 'doctors' ? `All Depts` : `All Risks`) : f.toUpperCase()}
                                 </option>
                             ))}
                         </select>
-                        <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 opacity-30 pointer-events-none" />
+                        <Filter className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-30 pointer-events-none" />
                     </div>
 
                     {canCreate && (
                         <button
                             onClick={() => setInputModal({ open: true, mode: 'create', item: null })}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-hover transition-colors shadow-sm">
-                            <Plus className="w-3.5 h-3.5" /> Add {type === 'doctors' ? 'Specialist' : 'Patient'}
+                            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[var(--luna-blue)] to-[#1e4ed8] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.1em] hover:brightness-110 active:scale-95 transition-all shadow-md shadow-blue-500/20 whitespace-nowrap"
+                        >
+                            <Plus className="w-3.5 h-3.5 stroke-[3px]" />
+                            {type === 'doctors' ? 'ADD SPECIALIST' : 'ADD PATIENT'}
                         </button>
                     )}
                 </div>
@@ -599,16 +572,6 @@ const ResourceList = ({ type, title, user }) => {
                                         
                                         <td className="px-4 py-4 text-right align-middle">
                                             <div className="flex items-center justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                                {type === 'patients' && isDoctor && (
-                                                    <button onClick={() => {
-                                                        setApptModal({ open: true, patient: item });
-                                                    }} title="Schedule Slot"
-                                                        className="px-3 py-1.5 rounded-lg border transition-all hover:bg-[var(--luna-primary)]/10 hover:border-[var(--luna-primary)]/30 hover:-translate-y-0.5 text-[9px] font-black uppercase tracking-widest whitespace-nowrap"
-                                                        style={{ color: 'var(--luna-primary)', background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                                                        Schedule Consult
-                                                    </button>
-                                                )}
-
                                                 {canEdit && (
                                                     <button onClick={(e) => { e.stopPropagation(); setInputModal({ open: true, mode: 'edit', item }); }} title="Configure Override"
                                                         className="p-1.5 rounded-lg border transition-all hover:bg-[var(--luna-primary)]/10 hover:border-[var(--luna-primary)]/30 hover:-translate-y-0.5"

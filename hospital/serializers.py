@@ -198,13 +198,16 @@ class PatientCreateSerializer(serializers.ModelSerializer):
 class AppointmentSerializer(serializers.ModelSerializer):
     patientName = serializers.ReadOnlyField(source='patient.get_name')
     doctorName = serializers.ReadOnlyField(source='doctor.get_name')
-
+    patientMobile = serializers.ReadOnlyField(source='patient.mobile')
+    doctorDepartment = serializers.ReadOnlyField(source='doctor.department')
+    patientId = serializers.ReadOnlyField(source='patient.id')
     doctor_permanent_link = serializers.ReadOnlyField(source='doctor.permanent_meet_link')
     
     class Meta:
         model = Appointment
         fields = [
             'id', 'patient', 'doctor', 'patientName', 'doctorName',
+            'patientMobile', 'doctorDepartment', 'patientId',
             'appointment_date', 'appointment_time', 'description', 'status', 'priority', 'notes',
             'meeting_link', 'doctor_permanent_link', 'created_at', 'updated_at'
         ]
@@ -236,6 +239,9 @@ class BillSerializer(serializers.ModelSerializer):
     class Meta:
         model = Bill
         fields = '__all__'
+        read_only_fields = ['invoice_number', 'total_amount']
+
+    doctor = serializers.IntegerField(write_only=True, required=False) # Visual/Logic absorber
 
     def get_patient_name(self, obj):
         return obj.patient.get_name if obj.patient else None
@@ -321,7 +327,7 @@ class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     first_name = serializers.CharField(max_length=50)
     last_name = serializers.CharField(max_length=50)
-    role = serializers.ChoiceField(choices=['patient', 'doctor', 'admin', 'receptionist', 'pharmacist'])
+    role = serializers.ChoiceField(choices=['patient', 'doctor', 'admin', 'receptionist'])
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
     address = serializers.CharField(max_length=200, required=False, allow_blank=True)
     department = serializers.CharField(max_length=60, required=False, allow_blank=True)

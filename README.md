@@ -75,7 +75,6 @@ These default accounts are hardcoded for consistent dev testing and will remain 
 | :--- | :--- | :--- | :--- |
 | **Administrator** | `test_admin` | `admin123` | [Clinical Portal](http://localhost:5173/login) |
 | **Physician** | `test_doctor` | `doctor123` | [Clinical Portal](http://localhost:5173/login) |
-| **Pharmacist** | `test_pharmacist` | `pharmacist123` | [Clinical Portal](http://localhost:5173/login) |
 | **Receptionist** | `test_receptionist` | `receptionist123`| [Clinical Portal](http://localhost:5173/login) |
 | **Patient** | `test_patient` | `patient123` | [Patient Terminal](http://localhost:5173/patient/login) |
 

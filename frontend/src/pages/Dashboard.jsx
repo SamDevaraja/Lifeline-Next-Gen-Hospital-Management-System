@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Activity, AlertCircle, Archive, ArrowRight, BarChart3, Bed, BellRing, Calendar, CheckCircle, 
+    Activity, AlertCircle, ArrowRight, BarChart3, Bed, BellRing, Calendar, CheckCircle, 
     ChevronDown, ChevronRight, Clock, DollarSign, FileText, Filter, FlaskConical, Globe, 
     HeartPulse, LayoutDashboard, Lock, LogOut, Mail, Menu, Moon, Pill, Plus, QrCode, Search, 
     Settings, Smartphone, Stethoscope, Sun, TrendingUp, User, Users, Video, Wallet, X
@@ -38,7 +38,6 @@ const LUNA = {
 
 
 import Overview from './dashboard/Overview';
-import DispensaryPage from './dashboard/DispensaryPage';
 import PharmacyPage from './dashboard/PharmacyPage';
 import { ConfirmModal, InputModal, DetailsModal } from './dashboard/Modals';
 
@@ -58,7 +57,6 @@ const getNavGroups = (role) => {
     const isDoctor = r === 'doctor';
     const isPatient = r === 'patient';
     const isReceptionist = r === 'receptionist';
-    const isPharmacist = r === 'pharmacist';
 
     const groups = [];
 
@@ -67,7 +65,6 @@ const getNavGroups = (role) => {
     else if (isDoctor) overviewLabel = 'Doctor Terminal';
     else if (isPatient) overviewLabel = 'My Health Portal';
     else if (isReceptionist) overviewLabel = 'Reception Desk';
-    else if (isPharmacist) overviewLabel = 'Pharmacy Desk';
 
     groups.push({
         title: 'Platform Core',
@@ -90,20 +87,21 @@ const getNavGroups = (role) => {
     if (careItems.length > 0) groups.push({ title: 'Clinical Operations', items: careItems });
 
     // ── Pharmacy Hub ──
-    if (isAdmin || isPharmacist || isDoctor) {
+    if (isAdmin || isDoctor) {
         const pharmItems = [];
         pharmItems.push({ to: '/dashboard/pharmacy', icon: <Pill className="w-5 h-5" />, label: 'Pharmacy Inventory' });
+        if (isAdmin) pharmItems.push({ to: '/dashboard/lab', icon: <FlaskConical className="w-5 h-5" />, label: 'Laboratory Hub' });
         groups.push({ title: 'Institutional Pharmacy', items: pharmItems });
     }
 
     // ── Finance & Analytics ──
     if (isAdmin || isReceptionist || isPatient) {
         const finItems = [];
-        finItems.push({ to: '/dashboard/billing', icon: <Wallet className="w-5 h-5" />, label: isPatient ? 'My Account' : 'Billing Engine', badge: 'LIVE' });
+        if (isAdmin || isReceptionist || isPatient) finItems.push({ to: '/dashboard/billing', icon: <Wallet className="w-5 h-5" />, label: isPatient ? 'My Account' : 'Billing Engine', badge: 'LIVE' });
         if (isAdmin) {
             finItems.push({ to: '/dashboard/reports', icon: <BarChart3 className="w-5 h-5" />, label: 'Enterprise Analytics' });
         }
-        groups.push({ title: 'Institutional Governance', items: finItems });
+        if (finItems.length > 0) groups.push({ title: 'Institutional Governance', items: finItems });
     }
 
     return groups;
@@ -282,11 +280,10 @@ const Dashboard = () => {
                     : 'radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.03) 0px, var(--luna-bg) 100%)',
                  color: 'var(--luna-text-main)' 
              }}>
-            <Toaster position="top-right" toastOptions={{ style: { borderRadius: '12px', fontWeight: 600, fontSize: '14px' } }} />
+            <Toaster position="top-right" toastOptions={{ duration: 4000, style: { borderRadius: '12px', fontWeight: 600, fontSize: '14px' } }} />
 
             {/* Sidebar */}
-            {user?.role?.toLowerCase() !== 'pharmacist' && (
-                <div className="flex">
+            <div className="flex">
                     {/* Mobile overlay */}
                     {sidebarOpen && <div className="fixed inset-0 z-30 md:hidden bg-black/60 backdrop-blur-sm transition-all" onClick={() => setSidebarOpen(false)} />}
 
@@ -447,9 +444,8 @@ const Dashboard = () => {
                         </div>
                     </aside>
                 </div>
-            )}
             {/* Main */}
-            <div className={`flex-grow flex flex-col h-screen overflow-hidden ${user?.role?.toLowerCase() !== 'pharmacist' ? 'md:ml-64 xl:ml-72' : ''}`}>
+            <div className="flex-grow flex flex-col h-screen overflow-hidden md:ml-64 xl:ml-72">
                 {/* Topbar - Integrated Institutional Header */}
                 <header className="px-8 sticky top-0 z-30 shrink-0 h-16 border-b transition-all duration-300"
                     style={{
@@ -459,183 +455,121 @@ const Dashboard = () => {
                         boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                     }}>
                     
-                    {user?.role?.toLowerCase() === 'pharmacist' ? (
-                        <div className="flex items-center justify-between w-full h-full gap-4">
-                            <div className="flex items-center gap-4 pr-10 border-r shrink-0" style={{ borderColor: 'var(--luna-border)' }}>
-                                <div className="p-1 rounded-xl shrink-0" style={{ background: 'rgba(30, 58, 138, 0.03)' }}>
-                                    <img src={logo} alt="Lifeline" className="w-9 h-9 object-contain drop-shadow-md" />
+                    <div className="flex items-center justify-between w-full h-full">
+                        {/* Left: Institutional Meta-Layer */}
+                        <div className="flex items-center gap-6">
+                            <button className="md:hidden p-2 rounded-xl transition-all hover:bg-[var(--luna-border)]" onClick={() => setSidebarOpen(true)} style={{ color: 'var(--luna-teal)' }}>
+                                <Menu className="w-5 h-5" />
+                            </button>
+                            
+                            <div className="hidden md:flex items-center gap-5">
+                                <div className="flex flex-col items-end">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-1 h-3.5 rounded-full bg-emerald-500/60 shadow-[0_0_8px_rgba(16,185,129,0.2)]" />
+                                        <p className="text-[15px] font-bold tracking-tight" style={{ color: 'var(--luna-text-main)', fontFamily: "'Outfit', sans-serif" }}>
+                                            {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).replace(' AM', '').replace(' PM', '')}
+                                            <span className="text-[9px] font-black opacity-30 ml-1 uppercase">
+                                                {currentTime.toLocaleTimeString([], { hour12: true }).split(' ').pop()}
+                                            </span>
+                                        </p>
+                                    </div>
                                 </div>
+
+                                <div className="h-6 w-[1px] opacity-10 hidden md:block" style={{ background: 'var(--luna-text-main)' }} />
+
                                 <div className="flex flex-col">
-                                    <p className="font-black text-sm uppercase tracking-tighter leading-none" style={{ color: 'var(--luna-text-main)' }}>
-                                        LIFELINE <span style={{ color: 'var(--luna-blue)' }}>HMS</span>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.15em] leading-none" style={{ color: 'var(--luna-text-main)' }}>
+                                        {currentTime.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase()}
                                     </p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                        <p className="font-black text-[8px] uppercase tracking-[0.2em] opacity-40" style={{ color: 'var(--luna-text-main)' }}>
-                                            Pharmacy Terminal
-                                        </p>
-                                    </div>
+                                    <p className="text-[8px] font-bold uppercase tracking-[0.15em] opacity-30 mt-1" style={{ color: 'var(--luna-text-muted)' }}>
+                                        {currentTime.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase()}
+                                    </p>
                                 </div>
-                            </div>
-                            
-                            <nav className="flex items-center gap-2">
-                                {[
-                                    { to: '/dashboard/dispensary', label: 'Dispensary', icon: <Archive className="w-4 h-4"/> },
-                                    { to: '/dashboard/pharmacy', label: 'Inventory', icon: <Pill className="w-4 h-4"/> },
-                                    { to: '/dashboard/lab', label: 'Labs', icon: <FlaskConical className="w-4 h-4"/> },
-                                    { to: '/dashboard/settings', label: 'Profile', icon: <Settings className="w-4 h-4"/> }
-                                ].map(link => {
-                                    const active = location.pathname.startsWith(link.to);
-                                    return (
-                                        <Link key={link.to} to={link.to} className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all border ${active ? 'bg-[var(--luna-info-bg)] text-[var(--luna-teal)]' : 'opacity-40 hover:opacity-100 hover:bg-white/5 opacity-40'}`}
-                                            style={{ 
-                                                borderColor: active ? 'var(--luna-teal)' : 'transparent',
-                                                color: active ? 'var(--luna-teal)' : 'var(--luna-text-main)'
-                                            }}>
-                                            <div className={`${active ? 'opacity-100' : 'opacity-40'}`}>{link.icon}</div>
-                                            <span>{link.label}</span>
-                                        </Link>
-                                    );
-                                })}
-                            </nav>
-                            
-                            <div className="flex items-center gap-3 shrink-0">
-                                <div className="hidden xl:flex flex-col items-end mr-2">
-                                    <p className="text-[10px] font-black uppercase tracking-widest leading-none" style={{ color: 'var(--luna-text-main)' }}>{user?.first_name || 'Pharmacist'}</p>
-                                    <p className="text-[7px] font-black uppercase tracking-[0.2em] opacity-30 mt-1">Institutional Dispenser</p>
-                                </div>
-
-                                <button onClick={toggleTheme} className="w-10 h-10 rounded-xl flex items-center justify-center transition-all border hover:bg-white/5" style={{ color: 'var(--luna-teal)', borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
-                                    {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                                </button>
-                                
-                                <Link to="/dashboard/notifications" className="w-10 h-10 rounded-xl flex items-center justify-center transition-all border relative hover:bg-white/5" style={{ color: 'var(--luna-text-dim)', borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
-                                    <BellRing className="w-4 h-4 opacity-70" />
-                                    {unreadCount > 0 && <span className="absolute -top-1 -right-1 min-w-[16px] h-16px px-1 bg-red-600 text-white rounded-md text-[7px] font-black flex items-center justify-center border-2" style={{ borderColor: 'var(--luna-bg)' }}>{unreadCount}</span>}
-                                </Link>
-
-                                <div className="h-8 w-[1px] mx-1 opacity-10" style={{ background: 'var(--luna-text-main)' }} />
-
-                                <button onClick={handleLogout} className="group flex items-center gap-2.5 pl-4 pr-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-red-500 transition-all border border-red-500/20 hover:bg-red-500/10 active:scale-95">
-                                    <span className="hidden lg:block">Exit Terminal</span> <LogOut className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
-                                </button>
                             </div>
                         </div>
-                    ) : (
-                        <div className="flex items-center justify-between w-full h-full">
-                            {/* Left: Institutional Meta-Layer */}
-                            <div className="flex items-center gap-6">
-                                <button className="md:hidden p-2 rounded-xl transition-all hover:bg-[var(--luna-border)]" onClick={() => setSidebarOpen(true)} style={{ color: 'var(--luna-teal)' }}>
-                                    <Menu className="w-5 h-5" />
-                                </button>
-                                
-                                <div className="hidden md:flex items-center gap-5">
-                                    <div className="flex flex-col items-end">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="w-1 h-3.5 rounded-full bg-emerald-500/60 shadow-[0_0_8px_rgba(16,185,129,0.2)]" />
-                                            <p className="text-[15px] font-bold tracking-tight" style={{ color: 'var(--luna-text-main)', fontFamily: "'Inter', sans-serif" }}>
-                                                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).replace(' AM', '').replace(' PM', '')}
-                                                <span className="text-[9px] font-black opacity-30 ml-1 uppercase">
-                                                    {currentTime.toLocaleTimeString([], { hour12: true }).split(' ').pop()}
-                                                </span>
-                                            </p>
-                                        </div>
-                                    </div>
 
-                                    <div className="h-6 w-[1px] opacity-10 hidden md:block" style={{ background: 'var(--luna-text-main)' }} />
-
-                                    <div className="flex flex-col">
-                                        <p className="text-[10px] font-black uppercase tracking-[0.15em] leading-none" style={{ color: 'var(--luna-text-main)' }}>
-                                            {currentTime.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase()}
-                                        </p>
-                                        <p className="text-[8px] font-bold uppercase tracking-[0.15em] opacity-30 mt-1" style={{ color: 'var(--luna-text-muted)' }}>
-                                            {currentTime.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase()}
-                                        </p>
-                                    </div>
-                                </div>
+                        {/* Right: Operational controls */}
+                        <div className="flex items-center gap-2 shrink-0">
+                            <div className="hidden xl:flex items-center gap-3 mr-4 pr-4 border-r" style={{ borderColor: 'var(--luna-border)' }}>
+                                <p className="text-[11px] font-extrabold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>{user?.get_name || user?.full_name}</p>
+                                <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border" 
+                                      style={{ 
+                                          background: 'var(--luna-info-bg)', 
+                                          color: 'var(--luna-teal)',
+                                          borderColor: 'var(--luna-teal)',
+                                          opacity: 0.8
+                                      }}>
+                                    {user?.role}
+                                </span>
                             </div>
 
-                            {/* Right: Operational controls */}
-                            <div className="flex items-center gap-2 shrink-0">
-                                <div className="hidden xl:flex items-center gap-3 mr-4 pr-4 border-r" style={{ borderColor: 'var(--luna-border)' }}>
-                                    <p className="text-[11px] font-extrabold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>{user?.get_name || user?.full_name}</p>
-                                    <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border" 
-                                          style={{ 
-                                              background: 'var(--luna-info-bg)', 
-                                              color: 'var(--luna-teal)',
-                                              borderColor: 'var(--luna-teal)',
-                                              opacity: 0.8
-                                          }}>
-                                        {user?.role}
+                            <div className="relative" ref={langRef}>
+                                <button className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border bg-[var(--luna-card)] hover:bg-white/5 group" 
+                                        style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }} 
+                                        onClick={() => setLangOpen(!langOpen)}>
+                                    <Globe className="w-3.5 h-3.5 opacity-60 transition-transform group-hover:rotate-12" style={{ color: 'var(--luna-teal)' }} />
+                                    <span className="hidden lg:inline-block translate-y-[0.5px]">{currentLang.label}</span>
+                                    <span className="lg:hidden">{currentLang.code.toUpperCase()}</span>
+                                    <ChevronDown className={`w-3 h-3 transition-transform duration-300 ${langOpen ? 'rotate-180' : 'opacity-40'}`} />
+                                </button>
+                                {langOpen && (
+                                    <div className="absolute right-0 mt-3 w-56 rounded-2xl overflow-hidden z-50 shadow-[0_20px_50px_rgba(0,0,0,0.3)] border" 
+                                         style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)', backdropFilter: 'blur(30px)' }}>
+                                        <div className="px-4 py-3 text-[9px] font-black uppercase tracking-[0.25em] opacity-40 border-b" style={{ borderColor: 'var(--luna-border)' }}>
+                                            Regional Identity Hub
+                                        </div>
+                                        <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-1.5">
+                                            {LANGUAGES.map(lang => (
+                                                <button key={lang.code} className="w-full text-left px-4 py-3 text-[11px] font-bold flex items-center justify-between gap-3 rounded-xl transition-all hover:bg-white/5 group/lang" 
+                                                        style={{ color: i18n.language === lang.code ? 'var(--luna-teal)' : 'var(--luna-text-muted)', background: i18n.language === lang.code ? 'rgba(56,189,248,0.05)' : 'transparent' }} 
+                                                        onClick={() => switchLang(lang.code)}>
+                                                    <div className="flex items-center gap-2.5">
+                                                        <span className="text-sm transition-transform group-hover/lang:scale-110">{lang.flag}</span>
+                                                        <span>{lang.label}</span>
+                                                    </div>
+                                                    {i18n.language === lang.code && <div className="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(56,189,248,0.4)]" style={{ background: 'var(--luna-blue)' }} />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <button onClick={toggleTheme} className="flex items-center gap-2.5 px-4 h-10 rounded-xl transition-all border group bg-[var(--luna-card)]" 
+                                    style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-teal)' }}>
+                                {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+                                <span className="hidden lg:inline-block text-[10px] font-black uppercase tracking-widest translate-y-[0.5px]">Theme</span>
+                            </button>
+
+                            <Link to="/dashboard/notifications" className="flex items-center gap-2.5 px-4 h-10 rounded-xl relative transition-all border group bg-[var(--luna-card)]" 
+                                  style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-dim)' }}>
+                                <BellRing className="w-3.5 h-3.5 opacity-60 group-hover:text-amber-500 transition-colors" />
+                                <span className="hidden lg:inline-block text-[10px] font-black uppercase tracking-widest translate-y-[0.5px]">Notifications</span>
+                                {unreadCount > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow-lg border-2" 
+                                          style={{ background: 'var(--luna-danger-text)', borderColor: 'var(--luna-card)' }}>
+                                        {unreadCount > 99 ? '99+' : unreadCount}
                                     </span>
-                                </div>
+                                )}
+                            </Link>
 
-                                <div className="relative" ref={langRef}>
-                                    <button className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border bg-[var(--luna-card)] hover:bg-white/5 group" 
-                                            style={{ color: 'var(--luna-text-main)', borderColor: 'var(--luna-border)' }} 
-                                            onClick={() => setLangOpen(!langOpen)}>
-                                        <Globe className="w-3.5 h-3.5 opacity-60 transition-transform group-hover:rotate-12" style={{ color: 'var(--luna-teal)' }} />
-                                        <span className="hidden lg:inline-block translate-y-[0.5px]">{currentLang.label}</span>
-                                        <span className="lg:hidden">{currentLang.code.toUpperCase()}</span>
-                                        <ChevronDown className={`w-3 h-3 transition-transform duration-300 ${langOpen ? 'rotate-180' : 'opacity-40'}`} />
-                                    </button>
-                                    {langOpen && (
-                                        <div className="absolute right-0 mt-3 w-56 rounded-2xl overflow-hidden z-50 shadow-[0_20px_50px_rgba(0,0,0,0.3)] border" 
-                                             style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)', backdropFilter: 'blur(30px)' }}>
-                                            <div className="px-4 py-3 text-[9px] font-black uppercase tracking-[0.25em] opacity-40 border-b" style={{ borderColor: 'var(--luna-border)' }}>
-                                                Regional Identity Hub
-                                            </div>
-                                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-1.5">
-                                                {LANGUAGES.map(lang => (
-                                                    <button key={lang.code} className="w-full text-left px-4 py-3 text-[11px] font-bold flex items-center justify-between gap-3 rounded-xl transition-all hover:bg-white/5 group/lang" 
-                                                            style={{ color: i18n.language === lang.code ? 'var(--luna-teal)' : 'var(--luna-text-muted)', background: i18n.language === lang.code ? 'rgba(56,189,248,0.05)' : 'transparent' }} 
-                                                            onClick={() => switchLang(lang.code)}>
-                                                        <div className="flex items-center gap-2.5">
-                                                            <span className="text-sm transition-transform group-hover/lang:scale-110">{lang.flag}</span>
-                                                            <span>{lang.label}</span>
-                                                        </div>
-                                                        {i18n.language === lang.code && <div className="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(56,189,248,0.4)]" style={{ background: 'var(--luna-blue)' }} />}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <button onClick={toggleTheme} className="flex items-center gap-2.5 px-4 h-10 rounded-xl transition-all border group bg-[var(--luna-card)]" 
-                                        style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-teal)' }}>
-                                    {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-                                    <span className="hidden lg:inline-block text-[10px] font-black uppercase tracking-widest translate-y-[0.5px]">Theme</span>
-                                </button>
-
-                                <Link to="/dashboard/notifications" className="flex items-center gap-2.5 px-4 h-10 rounded-xl relative transition-all border group bg-[var(--luna-card)]" 
-                                      style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-dim)' }}>
-                                    <BellRing className="w-3.5 h-3.5 opacity-60 group-hover:text-amber-500 transition-colors" />
-                                    <span className="hidden lg:inline-block text-[10px] font-black uppercase tracking-widest translate-y-[0.5px]">Notifications</span>
-                                    {unreadCount > 0 && (
-                                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full text-white text-[9px] font-black flex items-center justify-center shadow-lg border-2" 
-                                              style={{ background: 'var(--luna-danger-text)', borderColor: 'var(--luna-card)' }}>
-                                            {unreadCount > 99 ? '99+' : unreadCount}
-                                        </span>
-                                    )}
-                                </Link>
-                            </div>
                         </div>
-                    )}
+                    </div>
                 </header>
 
-                {/* Content Area - SCROLLABLE COMPARTMENT */}
-                <main className="flex-grow overflow-y-auto px-6 py-6 custom-scrollbar pb-24">
-                    {loading ? (
-                        <div className="flex items-center justify-center h-full">
-                            <div className="animate-pulse flex flex-col items-center">
-                                <div className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mb-4" style={{ borderColor: 'var(--luna-primary)', borderTopColor: 'transparent' }} />
-                                <p className="font-bold text-sm" style={{ color: 'var(--luna-text-muted)' }}>Synchronizing Clinical Environment...</p>
+                {/* Content Area - SCROLLABLE COMPARTMENT (Static for Admin Governance) */}
+                <main className={`flex-grow ${location.pathname === '/dashboard' && user?.role?.toLowerCase() === 'admin' ? 'overflow-hidden' : 'overflow-y-auto'} px-4 md:px-10 py-8 custom-scrollbar pb-24 transition-all duration-500`}>
+                    <div className="max-w-[1700px] mx-auto w-full">
+                        {loading ? (
+                            <div className="flex items-center justify-center h-full min-h-[400px]">
+                                <div className="animate-pulse flex flex-col items-center">
+                                    <div className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mb-4" style={{ borderColor: 'var(--luna-primary)', borderTopColor: 'transparent' }} />
+                                    <p className="font-bold text-sm" style={{ color: 'var(--luna-text-muted)' }}>Synchronizing Clinical Environment...</p>
+                                </div>
                             </div>
-                        </div>
-                    ) : (
+                        ) : (
                         <Routes location={location} key={location.pathname}>
-                                <Route path="/" element={user?.role?.toLowerCase() === 'pharmacist' ? <Navigate to="/dashboard/dispensary" replace /> : <Overview user={user} />} />
+                                <Route path="/" element={<Overview user={user} />} />
                                 <Route path="/doctors" element={<Suspense fallback={null}><ResourceList type="doctors" title="Medical Specialists" user={user} /></Suspense>} />
                                 <Route path="/patients" element={<Suspense fallback={<LoadingState />}><ResourceList type="patients" title="Patient Registry" user={user} /></Suspense>} />
                                 <Route path="/appointments" element={<Suspense fallback={<LoadingState />}><AppointmentList user={user} /></Suspense>} />
@@ -643,7 +577,6 @@ const Dashboard = () => {
                                 <Route path="/records" element={<Suspense fallback={<LoadingState />}><RecordsPage user={user} /></Suspense>} />
                                 <Route path="/telemedicine" element={<Suspense fallback={<LoadingState />}><TelemedicinePage user={user} /></Suspense>} />
                                 <Route path="/pharmacy" element={<PharmacyPage user={user} />} />
-                                <Route path="/dispensary" element={<DispensaryPage user={user} />} />
                                 <Route path="/lab" element={<Suspense fallback={<LoadingState />}><LabPage user={user} /></Suspense>} />
                                 <Route path="/notifications" element={<Suspense fallback={null}><NotificationsPage user={user} /></Suspense>} />
                                 <Route path="/reports" element={<Suspense fallback={null}><ReportsPage user={user} /></Suspense>} />
@@ -652,7 +585,8 @@ const Dashboard = () => {
                                     setUser(res.data);
                                 }} /></Suspense>} />
                             </Routes>
-                    )}
+                        )}
+                    </div>
                 </main>
             </div>
             <SearchModal 

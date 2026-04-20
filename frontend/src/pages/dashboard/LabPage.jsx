@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContext';
 import { LUNA } from "./Constants";
 import { InputModal, DetailsModal } from './Modals';
@@ -118,7 +118,8 @@ const LabPage = ({ user }) => {
     }
 
     return (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col h-[calc(100vh-140px)] gap-6 antialiased">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-[1700px] mx-auto w-full space-y-6 antialiased">
+            <Toaster position="top-right" />
             
             <DetailsModal
                 isOpen={detailsModal.open}
@@ -152,172 +153,160 @@ const LabPage = ({ user }) => {
                 ]}
             />
 
+            {/* Header: Unified Institutional Standard */}
+            <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center border shadow-sm transition-transform hover:scale-105" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                        <FlaskConical className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Medical Diagnostics Hub</h1>
+                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mt-0.5" style={{ color: 'var(--luna-text-muted)' }}>
+                            Departmental Feed • {refreshing ? 'Synchronizing Archive...' : `Total Records: ${filteredTests.length}`}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                    {/* Institutional Filter Layer */}
+                    <div className="relative w-full sm:min-w-[140px] sm:w-auto">
+                        <select 
+                            value={activeTab}
+                            onChange={(e) => setActiveTab(e.target.value)}
+                            className="w-full pl-4 pr-10 py-2.5 text-[10px] border rounded-xl appearance-none cursor-pointer focus:outline-none bg-[var(--luna-card)] font-black uppercase tracking-widest shadow-sm hover:border-blue-500/30"
+                            style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-main)' }}
+                        >
+                            <option value="all">Global Feed</option>
+                            <option value="abnormal">Critical Flags</option>
+                        </select>
+                        <Filter className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-30 pointer-events-none" />
+                    </div>
+
+                    <div className="relative group w-full lg:w-64">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 opacity-40 group-focus-within:opacity-100 transition-all text-blue-500" />
+                        <input 
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            placeholder="Scan diagnostics..."
+                            className="w-full pl-11 pr-4 py-2.5 text-[10px] border rounded-xl outline-none transition-all font-bold tracking-tight bg-[var(--luna-card)] hover:border-blue-500/30 focus:border-blue-500/50 shadow-sm"
+                            style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-main)' }}
+                        />
+                    </div>
+
+                    <button 
+                        onClick={() => setShowNewTestModal(true)}
+                        className="flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[var(--luna-blue)] to-[#1e4ed8] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.1em] hover:brightness-110 active:scale-95 transition-all shadow-md shadow-blue-500/20 whitespace-nowrap"
+                    >
+                        <Plus className="w-3.5 h-3.5 stroke-[3px]" /> New Diagnostic Entry
+                    </button>
+                </div>
+            </header>
+
             {/* Institutional Stats Row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { label: 'Total Analytics', value: filteredTests.length, color: '#1e3a8a' },
-                    { label: 'Pending Review', value: filteredTests.filter(t => !t.is_abnormal).length, color: '#f59e0b' },
+                    { label: 'Total Analytics', value: secureTests.length, color: 'var(--luna-blue)' },
+                    { label: 'Nominal Results', value: secureTests.filter(t => !t.is_abnormal).length, color: 'var(--luna-teal)' },
                     { label: 'Critical Flags', value: abnormalCount, color: '#ef4444' },
-                    { label: 'Sync Status', value: 'LIVE', color: '#4338ca' },
+                    { label: 'Operational Sync', value: 'LIVE', color: '#4338ca' },
                 ].map((s, i) => (
-                    <div key={i} className="p-4 border rounded-xl" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
-                        <p className="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-1" style={{ fontFamily: "'Inter', sans-serif" }}>{s.label}</p>
-                        <p className="text-2xl font-extrabold" style={{ color: s.color, fontFamily: "'Inter', sans-serif" }}>{loading ? '...' : s.value}</p>
+                    <div key={i} className="p-5 border rounded-2xl shadow-sm hover:scale-[1.02] transition-transform" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1.5" style={{ color: 'var(--luna-text-muted)' }}>{s.label}</p>
+                        <div className="flex items-end gap-2">
+                            <p className="text-2xl font-black" style={{ color: s.color }}>{loading ? '...' : s.value}</p>
+                        </div>
                     </div>
                 ))}
             </div>
 
-            <div className="flex-1 flex gap-6 overflow-hidden min-h-0">
-                
+            {/* Diagnostic Data Grid */}
+            <div className="rounded-2xl border shadow-sm overflow-hidden" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left border-collapse min-w-[800px]">
+                        <thead>
+                            <tr className="border-b" style={{ borderColor: 'var(--luna-border)', background: theme === 'dark' ? 'rgba(255,255,255,0.02)' : '#f8fafc' }}>
+                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.15em] opacity-50" style={{ color: 'var(--luna-text-main)' }}>Date</th>
+                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.15em] opacity-50 w-[30%]" style={{ color: 'var(--luna-text-main)' }}>Investigation</th>
+                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.15em] opacity-50 w-[20%]" style={{ color: 'var(--luna-text-main)' }}>Patient Record</th>
+                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.15em] opacity-50 w-[25%]" style={{ color: 'var(--luna-text-main)' }}>Diagnostic Findings</th>
+                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.15em] opacity-50 text-center" style={{ color: 'var(--luna-text-main)' }}>Risk Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredTests.length > 0 ? filteredTests.map((t, idx) => (
+                                <motion.tr 
+                                    key={idx}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: idx * 0.02 }}
+                                    onClick={() => setDetailsModal({ open: true, item: t, title: 'Laboratory Investigation Report' })}
+                                    className="border-b transition-all hover:bg-[rgba(30,58,138,0.03)] cursor-pointer group"
+                                    style={{ borderColor: 'var(--luna-border)' }}
+                                >
+                                    <td className="px-8 py-5 whitespace-nowrap">
+                                        <p className="text-[11px] font-bold tracking-tight opacity-40 uppercase" style={{ color: 'var(--luna-text-main)' }}>{t?.test_date ? new Date(t.test_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}</p>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-sm transition-transform group-hover:scale-110" 
+                                                 style={{ 
+                                                     background: 'var(--luna-navy)', 
+                                                     borderColor: 'var(--luna-border)', 
+                                                     color: t?.is_abnormal ? '#ef4444' : 'var(--luna-teal)' 
+                                                 }}>
 
+                                                {t?.image_data ? <img src={t.image_data} alt="scan" className="w-10 h-10 rounded-xl object-cover" /> : <FlaskConical className="w-4 h-4 opacity-50" />}
+                                            </div>
+                                            <div>
+                                                <p className="text-[13px] font-black uppercase tracking-tight leading-none" style={{ color: 'var(--luna-text-main)' }}>{t?.test_name || 'Unknown'}</p>
+                                                <p className="text-[9px] font-bold uppercase tracking-widest opacity-30 mt-1.5">{t?.category || 'Clinical Diagnostic'}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <p className="text-[13px] font-bold truncate max-w-[150px]" style={{ color: 'var(--luna-text-main)' }}>{t?.patient_name || 'N/A'}</p>
+                                        <p className="text-[8px] font-black uppercase tracking-widest opacity-30 mt-1">Institutional Profile</p>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <div className="flex items-baseline gap-1.5">
+                                            <span className="text-lg font-black tracking-tighter" style={{ color: t?.is_abnormal ? '#ef4444' : 'var(--luna-text-main)' }}>
+                                                {t?.result_value || 'N/A'}
+                                            </span>
+                                            {t?.unit && <span className="text-[10px] font-black uppercase opacity-30">{t.unit}</span>}
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5 text-center">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <span className={`${t?.is_abnormal ? 'badge-danger' : 'badge-success'} flex items-center gap-1.5`}
+                                                  style={{ fontSize: '9px', fontWeight: '900', letterSpacing: '0.1em' }}>
 
-                {/* --- MAIN FEED: DIAGNOSTIC STATION --- */}
-                <div className="flex-1 flex flex-col rounded-2xl border shadow-sm overflow-hidden" style={cardStyle}>
-                    
-                    <header className="px-8 flex items-center justify-between py-5 border-b shrink-0 gap-6" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-background-secondary)' }}>
-                        <div className="flex flex-col flex-shrink-0">
-                            <div>
-                                <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--luna-text-main)' }}>
-                                    <FlaskConical className="w-6 h-6 inline mr-2 text-rose-500" /> Medical Lab Tests
-                                </h1>
-                                <p className="text-xs font-bold mt-1" style={{ color: 'var(--luna-text-dim)' }}>Track and manage all diagnostic lab reports.</p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-4 flex-1 justify-end">
-                            <div className="flex bg-slate-500/5 p-1 rounded-xl border border-white/5 h-11 shrink-0">
-                                {[
-                                    { id: 'all', label: 'Global Feed', icon: <Activity className="w-4 h-4" /> },
-                                    { id: 'abnormal', label: 'Abnormalities', icon: <FlaskConical className="w-4 h-4" /> }
-                                ].map(tab => (
-                                    <button 
-                                        key={tab.id}
-                                        onClick={() => setActiveTab(tab.id)}
-                                        className={`flex items-center justify-center gap-2 px-5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all h-full ${activeTab === tab.id ? 'bg-primary text-white shadow-md' : 'opacity-50 hover:opacity-100'}`}
-                                    >
-                                        {tab.icon} {tab.label}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="relative group w-64 shrink-0">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 opacity-40" />
-                                <input 
-                                    value={searchTerm}
-                                    onChange={e => setSearchTerm(e.target.value)}
-                                    placeholder="Filter condition..."
-                                    className="w-full bg-slate-50/5 pl-11 pr-4 h-11 rounded-xl text-xs font-black uppercase border outline-none focus:border-primary/50 transition-all tracking-widest placeholder:opacity-50"
-                                    style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-main)' }}
-                                />
-                            </div>
-
-                            <button 
-                                onClick={() => setShowNewTestModal(true)}
-                                className="px-5 h-11 bg-primary shrink-0 text-white rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2.5 transition-all hover:bg-primary-hover active:scale-95 shadow-lg shadow-primary/20"
-                            >
-                                <Plus className="w-4 h-4" /> New Entry
-                            </button>
-                        </div>
-                    </header>
-
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
-                        {refreshing && <div className="absolute top-40 right-12 z-[100]"><RefreshCw className="w-5 h-5 animate-spin text-[#7c3aed]" /></div>}
-                        
-                        <div className="rounded-2xl border shadow-sm overflow-hidden" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-card)' }}>
-                            <div className="overflow-x-auto custom-scrollbar">
-                                <table className="w-full text-left border-collapse min-w-[800px]">
-                                    <thead>
-                                        <tr className="border-b" style={{ borderColor: 'var(--luna-border)', backgroundColor: 'var(--luna-background-secondary)' }}>
-                                            <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest opacity-50 whitespace-nowrap" style={{ color: 'var(--luna-text-main)' }}>Date</th>
-                                            <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest opacity-50" style={{ color: 'var(--luna-text-main)' }}>Investigation</th>
-                                            <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest opacity-50" style={{ color: 'var(--luna-text-main)' }}>Patient Record</th>
-                                            <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest opacity-50 text-left" style={{ color: 'var(--luna-text-main)' }}>Result</th>
-                                            <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest opacity-50 text-center" style={{ color: 'var(--luna-text-main)' }}>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredTests.length > 0 ? filteredTests.map((t, idx) => (
-                                            <motion.tr 
-                                                key={t?.id || idx}
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: idx * 0.03 }}
-                                                onClick={() => setDetailsModal({ open: true, item: t, title: 'Laboratory Investigation Report' })}
-                                                className="border-b transition-all hover:bg-black/5 cursor-pointer group"
-                                                style={{ borderColor: 'var(--luna-border)' }}
-                                            >
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className="text-xs font-bold uppercase tracking-widest opacity-60" style={textMain}>{t?.test_date ? new Date(t.test_date).toLocaleDateString() : 'N/A'}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border" style={{ background: t?.is_abnormal ? 'rgba(239, 68, 68, 0.05)' : 'var(--luna-background-secondary)', borderColor: t?.is_abnormal ? 'rgba(239, 68, 68, 0.2)' : 'var(--luna-border)', color: t?.is_abnormal ? '#ef4444' : '#7c3aed' }}>
-                                                            {t?.image_data ? <img src={t.image_data} alt="scan" className="w-10 h-10 rounded-xl object-cover opacity-90" /> : <FlaskConical className="w-4 h-4" />}
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-black uppercase tracking-tight leading-none" style={textMain}>{t?.test_name || 'Unknown'}</p>
-                                                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mt-1.5" style={textMain}>{t?.category || 'Unknown'}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <p className="text-sm font-bold truncate max-w-[150px]" style={textMain}>{t?.patient_name || 'Unknown'}</p>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-col items-start justify-center">
-                                                        <span 
-                                                            title={t?.result_value}
-                                                            className="text-lg font-black tracking-tight leading-tight truncate max-w-[150px] sm:max-w-[200px] md:max-w-[250px] lg:max-w-[300px]" 
-                                                            style={{ color: t?.is_abnormal ? '#ef4444' : 'var(--luna-text-main)' }}
-                                                        >
-                                                            {t?.result_value || 'N/A'}
-                                                        </span>
-                                                        {t?.unit && t.unit.toLowerCase() !== 'n/a' && !t.result_value?.includes(t.unit) && (
-                                                            <span className="mt-1 px-2 py-0.5 rounded text-[9px] font-black tracking-widest opacity-60 border border-slate-500/20" style={{ color: 'var(--luna-text-main)', backgroundColor: 'var(--luna-background-secondary)' }}>
-                                                                {t.unit}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-center whitespace-nowrap">
-                                                    {t?.is_abnormal ? (
-                                                        <span className="inline-block px-3 py-1 bg-red-500/10 text-red-500 text-[9px] font-bold uppercase tracking-[0.05em] rounded-lg border border-red-500/20 shadow-sm" style={{ fontFamily: "'Inter', sans-serif" }}>Critical</span>
-                                                    ) : (
-                                                        <span className="inline-block px-3 py-1 bg-green-500/10 text-green-500 text-[9px] font-bold uppercase tracking-[0.05em] rounded-lg border border-green-500/20 shadow-sm" style={{ fontFamily: "'Inter', sans-serif" }}>Nominal</span>
-                                                    )}
-                                                </td>
-                                            </motion.tr>
-                                        )) : (
-                                            <tr>
-                                                <td colSpan="5" className="py-28 text-center" style={{ color: 'var(--luna-text-main)' }}>
-                                                    <div className="flex flex-col items-center">
-                                                        <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-3 border border-white/5 opacity-20">
-                                                            <Search className="w-6 h-6" />
-                                                        </div>
-                                                        <h3 className="text-sm font-bold tracking-[0.2em] opacity-40 uppercase mb-1">No Results Found</h3>
-                                                        <p className="text-xs font-semibold opacity-30 max-w-[320px] leading-relaxed">
-                                                            No matches found. Please try a different search term.
-                                                        </p>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <footer className="px-8 py-5 border-t flex items-center justify-between shrink-0" style={{ borderColor: 'var(--luna-border)', background: 'var(--luna-background-secondary)' }}>
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-2 h-2 rounded-full bg-red-500 shadow-sm shadow-red-500/50" />
-                                <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Abnormal: {abnormalCount}</span>
-                            </div>
-                        </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Lifeline Laboratory Information Management System • v2.0.4</p>
-                    </footer>
+                                                {t?.is_abnormal ? 'CRITICAL' : 'NOMINAL'}
+                                            </span>
+                                        </div>
+                                    </td>
+                                </motion.tr>
+                            )) : (
+                                <tr>
+                                    <td colSpan="5" className="py-32 text-center">
+                                        <div className="flex flex-col items-center opacity-30">
+                                            <Search className="w-12 h-12 mb-4" />
+                                            <p className="text-xs font-black uppercase tracking-[0.2em]">No diagnostic data mapped.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
+                <footer className="px-8 py-4 border-t flex items-center justify-between opacity-30" style={{ borderColor: 'var(--luna-border)' }}>
+                    <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${abnormalCount > 0 ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                        <p className="text-[9px] font-black uppercase tracking-widest">
+                            {abnormalCount} Critical Path Findings detected in current feed
+                        </p>
+                    </div>
+                    <p className="text-[9px] font-black uppercase tracking-widest leading-none">Diagnostic Information Management System V2.1</p>
+                </footer>
             </div>
         </motion.div>
     );

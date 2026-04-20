@@ -71,10 +71,10 @@ const BillingPage = ({ user }) => {
     };
 
     const stats = {
-        total: allBills.reduce((acc, b) => acc + parseFloat(b.total_amount), 0),
-        pending: allBills.filter(b => b.status === 'pending').reduce((acc, b) => acc + parseFloat(b.total_amount), 0),
-        paidToday: allBills.filter(b => b.status === 'paid' && b.bill_date === new Date().toISOString().split('T')[0]).reduce((acc, b) => acc + parseFloat(b.total_amount), 0),
-        count: allBills.length
+        total: (allBills || []).reduce((acc, b) => acc + (parseFloat(b?.total_amount) || 0), 0),
+        pending: (allBills || []).filter(b => b?.status === 'pending').reduce((acc, b) => acc + (parseFloat(b?.total_amount) || 0), 0),
+        paidToday: (allBills || []).filter(b => b?.status === 'paid' && b?.bill_date === new Date().toISOString().split('T')[0]).reduce((acc, b) => acc + (parseFloat(b?.total_amount) || 0), 0),
+        count: (allBills || []).length
     };
 
     return (
@@ -205,7 +205,7 @@ const BillingPage = ({ user }) => {
                                     <td className="px-6 py-4 text-center w-[15%]">
                                         <div className="flex items-baseline justify-center gap-1">
                                             <span className="text-[11px] font-bold opacity-30">₹</span>
-                                            <p className="font-bold text-sm tracking-tight">{parseFloat(b.total_amount).toLocaleString()}</p>
+                                            <p className="font-bold text-sm tracking-tight">{(parseFloat(b?.total_amount) || 0).toLocaleString()}</p>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 hidden sm:table-cell text-center w-[10%]">

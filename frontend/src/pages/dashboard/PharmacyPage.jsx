@@ -85,7 +85,7 @@ const PharmacyPage = ({ user }) => {
 
     return (
         <div className="min-h-full w-full" style={{ background: 'var(--luna-bg)', color: 'var(--luna-text-main)' }}>
-            <div className="max-w-[1400px] mx-auto px-6 pt-1 pb-6 font-sans space-y-6">
+        <div className="max-w-[1600px] mx-auto px-6 pt-1 pb-6 font-sans space-y-6">
                 <Toaster position="top-right" />
 
                 {/* Modals */}
@@ -126,45 +126,47 @@ const PharmacyPage = ({ user }) => {
                     onCancel={() => setViewModal({ open: false })}
                 />
 
-                {/* Header: Minimal & Professional */}
-                <header className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-xl font-bold tracking-tight">Pharmacy Inventory</h1>
-                        <button onClick={fetchAll} className={`p-1 opacity-40 hover:opacity-100 transition-all ${loading ? 'animate-spin' : ''}`}>
-                            <RefreshCw className="w-3.5 h-3.5" />
-                        </button>
+                <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center border shadow-sm transition-transform hover:scale-105" style={{ background: 'var(--luna-card)', borderColor: 'var(--luna-border)' }}>
+                            <Pill className="w-6 h-6 text-blue-500" />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--luna-text-main)' }}>Pharmacy Inventory</h1>
+                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mt-0.5" style={{ color: 'var(--luna-text-muted)' }}>Lead Specialist • Departmental Terminal</p>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                        <div className="relative w-full md:w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-30" />
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                        <div className="relative group w-full lg:w-64">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 opacity-40 group-focus-within:opacity-100 transition-all text-blue-500" />
                             <input 
                                 type="text"
-                                placeholder="Search inventory..."
+                                placeholder="Scan inventory..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 text-xs border rounded-xl focus:outline-none transition-all shadow-sm bg-[var(--luna-card)]"
+                                className="w-full pl-11 pr-4 py-2.5 text-[10px] border rounded-xl outline-none transition-all font-bold tracking-tight bg-[var(--luna-card)] hover:border-blue-500/30 focus:border-blue-500/50 shadow-sm"
                                 style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-main)' }}
                             />
                         </div>
-                        <div className="relative">
+                        <div className="relative w-full sm:min-w-[150px] sm:w-auto">
                             <select 
                                 value={categoryFilter}
                                 onChange={(e) => setCategoryFilter(e.target.value)}
-                                className="pl-4 pr-8 py-2 text-xs border rounded-xl appearance-none cursor-pointer focus:outline-none transition-all shadow-sm bg-[var(--luna-card)]"
+                                className="w-full pl-4 pr-10 py-2.5 text-[10px] border rounded-xl appearance-none cursor-pointer focus:outline-none bg-[var(--luna-card)] font-bold tracking-tight shadow-sm hover:border-blue-500/30"
                                 style={{ borderColor: 'var(--luna-border)', color: 'var(--luna-text-main)' }}
                             >
                                 <option value="all">All Categories</option>
                                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
-                            <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 opacity-30 rotate-90" />
+                            <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-30 pointer-events-none rotate-90" />
                         </div>
                         {user?.role !== 'doctor' && (
                             <button
                                 onClick={() => setItemModal({ open: true, mode: 'create', item: null })}
-                                className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-hover transition-colors shadow-sm"
+                                className="flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[var(--luna-blue)] to-[#1e4ed8] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.1em] hover:brightness-110 active:scale-95 transition-all shadow-md shadow-blue-500/20 whitespace-nowrap"
                             >
-                                <Plus className="w-3.5 h-3.5" /> Add Item
+                                <Plus className="w-3.5 h-3.5 stroke-[3px]" /> Add Item
                             </button>
                         )}
                     </div>

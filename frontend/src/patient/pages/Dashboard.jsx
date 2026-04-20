@@ -355,7 +355,7 @@ const Dashboard = () => {
                                 <div className="flex flex-col">
                                     <div className="flex items-center gap-2.5">
                                         <div className="w-1 h-3.5 rounded-full bg-emerald-500/60 shadow-[0_0_8px_rgba(16,185,129,0.3)]" />
-                                        <p className="text-[15px] font-black tracking-tight" style={{ color: 'var(--luna-text-main)', fontFamily: "'Inter', sans-serif" }}>
+                                        <p className="text-[15px] font-bold tracking-tight" style={{ color: 'var(--luna-text-main)', fontFamily: "'Outfit', sans-serif" }}>
                                             {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).replace(' AM', '').replace(' PM', '')}
                                             <span className="text-[9px] font-black opacity-30 ml-1 uppercase">
                                                 {currentTime.toLocaleTimeString([], { hour12: true }).split(' ').pop()}

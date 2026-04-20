@@ -108,7 +108,7 @@ def staff_search(request):
             })
             
     # Search Meds if pharmacist
-    if search_type in ['all', 'pharmacy'] and role in ['admin', 'pharmacist']:
+    if search_type in ['all', 'pharmacy'] and role == 'admin':
         items = PharmacyItem.objects.filter(
             Q(name__icontains=q) | 
             Q(category__icontains=q)
@@ -280,6 +280,13 @@ def dashboard_stats(request):
                 'pending_bills': Bill.objects.filter(patient=pat, status='pending').count(),
                 'total_records': MedicalRecord.objects.filter(patient=pat).count(),
                 'latest_risk_level': pat.risk_level,
+            }
+        elif role in ['receptionist', 'nurse']:
+            stats = {
+                'total_patients': Patient.objects.filter(status=True, is_deleted=False).count(),
+                'today_appointments': Appointment.objects.filter(appointment_date=today, is_deleted=False if hasattr(Appointment, 'is_deleted') else Q()).count(),
+                'pending_appointments': Appointment.objects.filter(status='pending').count(),
+                'pending_bills': Bill.objects.filter(status='pending').count(),
             }
         else:
             # Fallback for other staff roles
@@ -507,16 +514,17 @@ class PatientViewSet(viewsets.ModelViewSet):
         qs = self.queryset.filter(is_deleted=False)
 
         # HIPAA Privacy: Doctors see only their patients. Patients see ONLY themselves.
+        # Receptionists and Nurses have registry access for administrative operational flow.
         role = getattr(user, 'profile', None) and user.profile.role or 'patient'
         
-        if user.is_superuser or role == 'admin':
-            pass # Super Admins see all
+        if user.is_superuser or role in ['admin', 'receptionist', 'nurse']:
+            pass # Management and Front-Desk see all for administrative routing
         elif hasattr(user, 'doctor'):
             qs = qs.filter(assigned_doctor=user.doctor)
         elif hasattr(user, 'patient'):
             qs = qs.filter(user=user)
         else:
-            # All other users (including non-clinical staff) see nothing in patient registry by default
+            # Restricted clinical isolation
             qs = qs.none() 
 
         status_filter = self.request.query_params.get('status')
@@ -612,7 +620,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             qs = qs.filter(doctor=user.doctor, patient__assigned_doctor=user.doctor)
         elif hasattr(user, 'patient') and role == 'patient':
             qs = qs.filter(patient=user.patient)
-        elif user.is_superuser or role == 'admin':
+        elif user.is_superuser or role in ['admin', 'receptionist', 'nurse']:
             pass
         else:
             qs = qs.none()
@@ -800,7 +808,7 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
             qs = qs.filter(doctor=user.doctor, patient__assigned_doctor=user.doctor)
         elif hasattr(user, 'patient') and not user.is_superuser:
             qs = qs.filter(patient=user.patient)
-        elif user.is_superuser or (hasattr(user, 'profile') and user.profile.role == 'admin'):
+        elif user.is_superuser or (hasattr(user, 'profile') and user.profile.role in ['admin', 'receptionist', 'nurse']):
             pass
         elif not user.is_staff:
             qs = qs.none()
@@ -953,14 +961,14 @@ class BillViewSet(viewsets.ModelViewSet):
         role = getattr(user, 'profile', None) and user.profile.role or 'patient'
         
         qs = self.queryset
-        if user.is_superuser or role in ['admin', 'pharmacist', 'receptionist']:
+        if user.is_superuser or role in ['admin', 'receptionist']:
             pass # Financial controllers see all ledgers
         elif hasattr(user, 'patient'):
             qs = qs.filter(patient=user.patient)
         elif hasattr(user, 'doctor'):
             qs = qs.filter(patient__assigned_doctor=user.doctor)
             
-        if not user.is_staff and not hasattr(user, 'doctor') and role not in ['pharmacist', 'receptionist']:
+        if not user.is_staff and not hasattr(user, 'doctor') and role != 'receptionist':
             qs = qs.filter(patient__is_deleted=False)
             
         bill_status = self.request.query_params.get('status')
@@ -970,6 +978,12 @@ class BillViewSet(viewsets.ModelViewSet):
         if patient_id:
             qs = qs.filter(patient_id=patient_id)
         return qs.order_by('-bill_date')
+
+    def perform_create(self, serializer):
+        # Extract metadata used for pre-filling but not stored in the Bill model
+        if 'doctor' in serializer.validated_data:
+            serializer.validated_data.pop('doctor')
+        serializer.save()
 
     @action(detail=True, methods=['post'])
     def mark_paid(self, request, pk=None):
@@ -991,110 +1005,118 @@ class BillViewSet(viewsets.ModelViewSet):
         from reportlab.lib import colors # type: ignore
         from reportlab.lib.pagesizes import A4 # type: ignore
         
-        bill = self.get_object()
-        
-        # Zero-Fail Name Logic
-        p_name = "UNREGISTERED GUEST"
-        if bill.patient:
-            p_name = str(bill.patient.get_name)
-        elif bill.guest_name:
-            p_name = str(bill.guest_name)
+        try:
+            bill = self.get_object()
+            
+            # Zero-Fail Name Logic
+            p_name = "UNREGISTERED GUEST"
+            if bill.patient:
+                p_name = str(bill.patient.get_name)
+            elif bill.guest_name:
+                p_name = str(bill.guest_name)
 
-        patient_id_str = f"PID-{bill.patient.id:04d}" if bill.patient else f"G-MOBILE: {bill.guest_mobile or 'N/A'}"
+            patient_id_label = "ID / CONTACT"
+            if bill.patient:
+                patient_id_val = f"PID-{bill.patient.id:04d}"
+            else:
+                patient_id_val = f"G-MOBILE: {bill.guest_mobile or 'N/A'}"
 
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=50, bottomMargin=50)
-        elements = []
-        styles = getSampleStyleSheet()
+            buffer = io.BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=50, bottomMargin=50)
+            elements = []
+            styles = getSampleStyleSheet()
 
-        # Custom Styles (LUNA Theme)
-        title_style = ParagraphStyle(
-            'LUNATitle', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#0F4C81'),
-            spaceAfter=5, fontName='Helvetica-Bold'
-        )
-        subtitle_style = ParagraphStyle(
-            'LUNASub', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#2EC4B6'),
-            spaceAfter=20, fontName='Helvetica-Bold'
-        )
-        norm_style = ParagraphStyle('LUNANorm', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#061e3a'))
+            # Custom Styles (LUNA Theme)
+            title_style = ParagraphStyle(
+                'LUNATitle', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#0F4C81'),
+                spaceAfter=5, fontName='Helvetica-Bold'
+            )
+            subtitle_style = ParagraphStyle(
+                'LUNASub', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#2EC4B6'),
+                spaceAfter=20, fontName='Helvetica-Bold'
+            )
+            norm_style = ParagraphStyle('LUNANorm', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#061e3a'))
 
-        # Header Section
-        elements.append(Paragraph("Lifeline Hospital", title_style))
-        elements.append(Paragraph("INSTITUTIONAL BILLING TERMINAL", subtitle_style))
-        elements.append(Paragraph("Lifeline Medical Tower, Koramangala<br/>Bangalore — 560034<br/>Phone: +91 80 4567 8900", norm_style))
-        elements.append(Spacer(1, 20))
+            # Header Section
+            elements.append(Paragraph("Lifeline Hospital", title_style))
+            elements.append(Paragraph("INSTITUTIONAL BILLING TERMINAL", subtitle_style))
+            elements.append(Paragraph("Lifeline Medical Tower, Koramangala<br/>Bangalore — 560034<br/>Phone: +91 80 4567 8900", norm_style))
+            elements.append(Spacer(1, 20))
 
-        # Invoice Info vs Patient Info
-        info_data = [
-            [
-                Paragraph(f"<b>Billed To:</b><br/>{p_name}<br/>ID: {patient_id_str}", norm_style),
-                Paragraph(f"<b>Invoice #:</b> {str(bill.invoice_number)}<br/><b>Date:</b> {str(bill.bill_date)}<br/><b>Status:</b> {str(bill.status).upper()}", norm_style)
+            # Invoice Info vs Patient Info
+            info_data = [
+                [
+                    Paragraph(f"<b>Billed To:</b><br/>{p_name}<br/>{patient_id_label}: {patient_id_val}", norm_style),
+                    Paragraph(f"<b>Invoice #:</b> {str(bill.invoice_number)}<br/><b>Date:</b> {str(bill.bill_date)}<br/><b>Status:</b> {str(bill.status).upper()}", norm_style)
+                ]
             ]
-        ]
-        info_table = Table(info_data, colWidths=[250, 250])
-        info_table.setStyle(TableStyle([
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 20),
-        ]))
-        elements.append(info_table)
-        elements.append(Spacer(1, 15))
+            info_table = Table(info_data, colWidths=[250, 250])
+            info_table.setStyle(TableStyle([
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 20),
+            ]))
+            elements.append(info_table)
+            elements.append(Spacer(1, 15))
 
-        # Line Items Table
-        data = [
-            ['Description', 'Amount (₹)'],
-            ['Consultation Fee', f"{float(bill.consultation_fee or 0):,.2f}"],
-            ['Medicine Cost', f"{float(bill.medicine_cost or 0):,.2f}"],
-            ['Test & Diagnostic Cost', f"{float(bill.test_cost or 0):,.2f}"],
-            ['Room / Facility Charge', f"{float(bill.room_charge or 0):,.2f}"],
-            ['Other Charges', f"{float(bill.other_charges or 0):,.2f}"]
-        ]
+            # Line Items Table
+            data = [
+                ['Description', 'Amount (INR)'],
+                ['Consultation Fee', f"{float(bill.consultation_fee or 0):,.2f}"],
+                ['Medicine Cost', f"{float(bill.medicine_cost or 0):,.2f}"],
+                ['Test & Diagnostic Cost', f"{float(bill.test_cost or 0):,.2f}"],
+                ['Room / Facility Charge', f"{float(bill.room_charge or 0):,.2f}"],
+                ['Other Charges', f"{float(bill.other_charges or 0):,.2f}"]
+            ]
 
-        subtotal = float(bill.consultation_fee or 0) + float(bill.medicine_cost or 0) + float(bill.test_cost or 0) + float(bill.room_charge or 0) + float(bill.other_charges or 0)
-        discount_amt = subtotal * (float(bill.discount or 0) / 100)
-        tax_amt = (subtotal - discount_amt) * (float(bill.tax_rate or 18) / 100)
+            subtotal = float(bill.consultation_fee or 0) + float(bill.medicine_cost or 0) + float(bill.test_cost or 0) + float(bill.room_charge or 0) + float(bill.other_charges or 0)
+            discount_amt = subtotal * (float(bill.discount or 0) / 100)
+            tax_amt = (subtotal - discount_amt) * (float(bill.tax_rate or 18) / 100)
 
-        data.append(['', '']) # empty spacer
-        data.append(['Subtotal', f"{subtotal:,.2f}"])
-        data.append([f"Discount ({bill.discount}%)", f"-{discount_amt:,.2f}"])
-        data.append([f"Tax ({bill.tax_rate}%)", f"+{tax_amt:,.2f}"])
-        data.append(['TOTAL AMOUNT', f"{float(bill.total_amount or 0):,.2f}"])
+            data.append(['', '']) # empty spacer
+            data.append(['Subtotal', f"{subtotal:,.2f}"])
+            data.append([f"Discount ({bill.discount}%)", f"-{discount_amt:,.2f}"])
+            data.append([f"Tax ({bill.tax_rate}%)", f"+{tax_amt:,.2f}"])
+            data.append(['TOTAL AMOUNT', f"{float(bill.total_amount or 0):,.2f}"])
 
-        table = Table(data, colWidths=[350, 150])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (1,0), colors.HexColor('#0F4C81')),
-            ('TEXTCOLOR', (0,0), (1,0), colors.whitesmoke),
-            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-            ('ALIGN', (1,0), (1,-1), 'RIGHT'),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,0), 12),
-            ('BOTTOMPADDING', (0,0), (-1,0), 10),
-            ('TOPPADDING', (0,1), (-1,-1), 8),
-            ('BOTTOMPADDING', (0,1), (-1,-1), 8),
-            # Table borders and lines
-            ('LINEBELOW', (0,0), (-1,-1), 0.5, colors.HexColor('#A7EBF2')),
-            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,-1), (-1,-1), 12),
-            ('TEXTCOLOR', (0,-1), (1,-1), colors.HexColor('#2EC4B6')),
-            ('LINEABOVE', (0,-1), (-1,-1), 1.5, colors.HexColor('#0F4C81')),
-            ('LINEBELOW', (0,-1), (-1,-1), 1.5, colors.HexColor('#0F4C81')),
-        ]))
-        
-        elements.append(table)
-        elements.append(Spacer(1, 40))
-        
-        # Footer
-        elements.append(Paragraph("Thank you for choosing Lifeline Hospital. For billing inquiries, contact billing@lifeline.health", norm_style))
-        if bill.status == 'paid':
-            elements.append(Spacer(1, 10))
-            elements.append(Paragraph(f"<b>Payment Method:</b> {str(bill.payment_method or '').capitalize()}<br/><b>Paid On:</b> {str(bill.paid_date or '')}", norm_style))
+            table = Table(data, colWidths=[350, 150])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0F4C81')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,0), 12),
+                ('BOTTOMPADDING', (0,0), (-1,0), 10),
+                ('TOPPADDING', (0,1), (-1,-1), 8),
+                ('BOTTOMPADDING', (0,1), (-1,-1), 8),
+                # Table borders and lines
+                ('LINEBELOW', (0,0), (-1,-1), 0.5, colors.HexColor('#A7EBF2')),
+                ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,-1), (-1,-1), 12),
+                ('TEXTCOLOR', (0,-1), (-1,-1), colors.HexColor('#2EC4B6')),
+                ('LINEABOVE', (0,-1), (-1,-1), 1.5, colors.HexColor('#0F4C81')),
+                ('LINEBELOW', (0,-1), (-1,-1), 1.5, colors.HexColor('#0F4C81')),
+            ]))
+            
+            elements.append(table)
+            elements.append(Spacer(1, 40))
+            
+            # Footer
+            elements.append(Paragraph("Thank you for choosing Lifeline Hospital. For billing inquiries, contact billing@lifeline.health", norm_style))
+            if bill.status == 'paid':
+                elements.append(Spacer(1, 10))
+                elements.append(Paragraph(f"<b>Payment Method:</b> {str(bill.payment_method or '').capitalize()}<br/><b>Paid On:</b> {str(bill.paid_date or '')}", norm_style))
 
-        doc.build(elements)
-        pdf = buffer.getvalue()
-        buffer.close()
-        
-        response = HttpResponse(pdf, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Invoice_{str(bill.invoice_number or uuid.uuid4().hex[:6])}.pdf"'
-        return response
+            doc.build(elements)
+            pdf = buffer.getvalue()
+            buffer.close()
+            
+            response = HttpResponse(pdf, content_type='application/pdf')
+            filename = f"Invoice_{str(bill.invoice_number or uuid.uuid4().hex[:6])}.pdf"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        except Exception as e:
+            return HttpResponse(f"Clinical PDF Generation Error: {str(e)}", status=500)
 
 
 class NotificationViewSet(viewsets.ModelViewSet):
@@ -1304,7 +1326,7 @@ class LabTestViewSet(viewsets.ModelViewSet):
             qs = qs.filter(patient__assigned_doctor=user.doctor)
         elif hasattr(user, 'patient') and not user.is_superuser:
             qs = qs.filter(patient=user.patient)
-        elif user.is_superuser or (hasattr(user, 'profile') and user.profile.role == 'admin'):
+        elif user.is_superuser or (hasattr(user, 'profile') and user.profile.role in ['admin', 'receptionist', 'nurse']):
             pass
         elif not user.is_staff:
             qs = qs.none()
@@ -1328,7 +1350,7 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
             qs = qs.filter(doctor=user.doctor, patient__assigned_doctor=user.doctor)
         elif hasattr(user, 'patient') and not user.is_superuser:
             qs = qs.filter(patient=user.patient)
-        elif user.is_superuser or (hasattr(user, 'profile') and user.profile.role in ['admin', 'pharmacist']):
+        elif user.is_superuser or (hasattr(user, 'profile') and user.profile.role == 'admin'):
             pass
         elif not user.is_staff:
             qs = qs.none()
@@ -1449,9 +1471,9 @@ class PharmacyOrderViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Pharmacists see all orders, others see their own (if applicable)
         user = self.request.user
-        if hasattr(user, 'profile') and user.profile.role == 'pharmacist':
+        if user.is_superuser or (hasattr(user, 'profile') and user.profile.role == 'admin'):
             return self.queryset
-        return self.queryset.filter(pharmacist=user)
+        return self.queryset.filter(assigned_staff=user)
 
     @action(detail=False, methods=['post'])
     def process_order(self, request):
@@ -1536,7 +1558,7 @@ class PharmacyOrderViewSet(viewsets.ModelViewSet):
 
 # ─── STAFF GOVERNANCE ViewSet (Module 6) ─────────────────────
 class StaffViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.filter(profile__role__in=['admin', 'doctor', 'pharmacist', 'receptionist']).select_related('profile').all()
+    queryset = User.objects.filter(profile__role__in=['admin', 'doctor', 'receptionist']).select_related('profile').all()
     serializer_class = StaffUserSerializer
     permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
