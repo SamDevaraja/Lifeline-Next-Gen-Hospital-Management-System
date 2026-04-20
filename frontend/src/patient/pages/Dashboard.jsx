@@ -160,14 +160,6 @@ const Dashboard = () => {
         }
     }, [user]);
 
-    // Show deferred login success toast (set by Login page to avoid delay there)
-    useEffect(() => {
-        const loginMsg = sessionStorage.getItem('login-toast');
-        if (loginMsg) {
-            toast.success(loginMsg);
-            sessionStorage.removeItem('login-toast');
-        }
-    }, []);
 
     // Close lang dropdown when clicking outside
     useEffect(() => {

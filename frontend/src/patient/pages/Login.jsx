@@ -46,7 +46,6 @@ const Login = () => {
             localStorage.setItem('lifeline-user', JSON.stringify(userRes.data));
 
             // Queue a welcome toast to show on the dashboard (avoids waiting here)
-            sessionStorage.setItem('login-toast', `Secure patient session established for ${userRes.data.first_name || userRes.data.username}.`);
 
             // Check if Google Translate is active (non-English language selected)
             // If so, use full page navigation so Google Translate can properly rehydrate.
@@ -91,7 +90,6 @@ const Login = () => {
                 
                 localStorage.setItem('lifeline-user', JSON.stringify(userRes.data));
                 
-                sessionStorage.setItem('login-toast', `Google sign in successful for ${userRes.data.first_name || userRes.data.username}.`);
                 
                 const isTranslated = document.cookie.includes('googtrans=/en/') &&
                     !document.cookie.includes('googtrans=/en/en');

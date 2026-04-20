@@ -48,7 +48,6 @@ const Login = () => {
             localStorage.setItem('lifeline-user', JSON.stringify(userRes.data));
 
             // Queue a welcome toast to show on the dashboard
-            sessionStorage.setItem('login-toast', `Secure session established for ${userRes.data.first_name || userRes.data.username}.`);
 
             // Redirect based on role
             const role = (userRes.data.role || '').toLowerCase();
@@ -82,7 +81,6 @@ const Login = () => {
                 localStorage.setItem('token', authToken);
                 const userRes = await api.get('me/', { headers: { Authorization: `Token ${authToken}` } });
                 localStorage.setItem('lifeline-user', JSON.stringify(userRes.data));
-                sessionStorage.setItem('login-toast', `Welcome, ${userRes.data.first_name || userRes.data.username}. Google Identity Verified.`);
                 const role = (userRes.data.role || '').toLowerCase();
                 navigate(role === 'patient' ? '/patient/dashboard' : '/dashboard');
             } catch (err) {

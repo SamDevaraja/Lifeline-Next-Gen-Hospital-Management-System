@@ -92,7 +92,7 @@ const Signup = () => {
 
                 localStorage.setItem('lifeline-user', JSON.stringify(userRes.data));
                 
-                toast.success('Sign up completed via Google!', { id: loadingId });
+                toast.success('Sign up completed via Google!', { id: loadingId, duration: 3000 });
                 
                 setTimeout(() => {
                     const role = (userRes.data.role || '').toLowerCase();
